@@ -1,57 +1,13 @@
 {
   "name": "picview",
-  "version": "1.0.0",
+  "version": "1.2.1",
+  "private": true,
   "description": "PicView 이미지 뷰어",
-  "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --win nsis --x64 --publish never"
+    "start": "tauri dev",
+    "dist": "tauri build"
   },
-  "author": "PicView",
   "devDependencies": {
-    "electron": "^45.3.3",
-    "electron-builder": "^26.18.0",
-    "pptxgenjs": "^4.0.1"
-  },
-  "productName": "PicView",
-  "build": {
-    "appId": "com.picview.app",
-    "productName": "PicView",
-    "files": [
-      "main.js",
-      "preload.js",
-      "renderer/**/*",
-      "build/icon.png"
-    ],
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.ico",
-      "signAndEditExecutable": true
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "perMachine": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "PicView",
-      "artifactName": "PicView-Setup-${version}.exe",
-      "language": "1042",
-      "installerLanguages": [
-        "ko_KR"
-      ],
-      "multiLanguageInstaller": false
-    },
-    "publish": null
+    "@tauri-apps/cli": "^2"
   }
 }

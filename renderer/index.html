@@ -2,8 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' localimg: blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' localimg: blob: data:">
-<title>PicView</title>
+<title>Sweet picView</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -27,6 +26,7 @@
       </select>
       <button id="btnSortDir" class="btn icon" title="오름차순/내림차순">↑</button>
       <input id="thumbSize" type="range" min="80" max="320" value="160" title="썸네일 크기">
+      <button id="btnDefault" class="btn icon" title="Sweet picView를 기본 이미지 뷰어로 설정">⚙ 기본 뷰어</button>
     </div>
   </header>
 
@@ -40,6 +40,14 @@
     </div>
     <div class="tb-group">
       <span id="selInfo" class="sel-info">선택 없음</span>
+      <span class="seg" title="선택한 이미지만 뷰어로 보기">
+        <span class="seg-lbl">👁 선택 보기</span>
+        <button class="btn seg-b" data-view="1">1장</button>
+        <button class="btn seg-b" data-view="2">2장</button>
+        <button class="btn seg-b" data-view="4">4장</button>
+      </span>
+      <button id="btnResize" class="btn" title="선택한 이미지 크기 바꾸기">↔ 리사이즈</button>
+      <button id="btnRename" class="btn" title="선택한 파일 이름 바꾸기 (F2)">✎ 이름 바꾸기</button>
       <button id="btnPpt" class="btn primary" title="선택한 이미지를 PowerPoint로 (Ctrl+E)">📊 PPT로 내보내기</button>
       <button id="btnPrint" class="btn primary" title="선택한 이미지 인쇄 (Ctrl+P)">🖨 인쇄</button>
     </div>
@@ -60,7 +68,8 @@
     <section id="gridWrap" tabindex="0">
       <div id="grid"></div>
       <div id="empty">
-        <div class="empty-icon">🖼</div>
+        <img class="empty-logo" src="logo.png" alt="Studio Sweet">
+        <div class="empty-title">Sweet picView</div>
         <div>왼쪽에서 폴더를 고르거나 <b>📂 폴더 열기</b>를 누르세요.</div>
         <div class="sub">폴더나 이미지를 이 창으로 끌어다 놓아도 됩니다.</div>
       </div>
@@ -77,7 +86,8 @@
 
 <!-- 전체 화면 뷰어 -->
 <div id="viewer" class="hidden">
-  <div id="vStage"><img id="vImg" alt="" draggable="false"></div>
+  <div id="vStage" class="n1"></div>
+  <aside id="vInfoPanel" class="hidden"></aside>
   <div id="vTop">
     <span id="vName"></span>
     <span id="vCounter"></span>
@@ -86,21 +96,26 @@
     <button class="vbtn" data-act="prev" title="이전 (← / Backspace)">◀</button>
     <button class="vbtn" data-act="next" title="다음 (→ / Space)">▶</button>
     <span class="vsep"></span>
+    <button class="vbtn lay" data-act="lay1" title="1장 보기 (1)">▢ 1장</button>
+    <button class="vbtn lay" data-act="lay2" title="2장 보기 (2)">◫ 2장</button>
+    <button class="vbtn lay" data-act="lay4" title="4장 보기 (4)">⊞ 4장</button>
+    <button class="vbtn" data-act="selOnly" id="vSelOnlyBtn" title="선택한 이미지만 보기 (O)">선택만</button>
+    <span class="vsep"></span>
     <button class="vbtn" data-act="zoomOut" title="축소 (-)">－</button>
     <span id="vZoom">100%</span>
     <button class="vbtn" data-act="zoomIn" title="확대 (+)">＋</button>
     <button class="vbtn" data-act="fit" title="화면에 맞춤 (0)">맞춤</button>
-    <button class="vbtn" data-act="actual" title="실제 크기 (1)">1:1</button>
+    <button class="vbtn" data-act="actual" title="실제 크기 (Z)">1:1</button>
     <span class="vsep"></span>
     <button class="vbtn" data-act="rotL" title="왼쪽으로 회전 (L)">⟲</button>
     <button class="vbtn" data-act="rotR" title="오른쪽으로 회전 (R)">⟳</button>
     <span class="vsep"></span>
     <button class="vbtn" data-act="select" id="vSelBtn" title="선택/해제 (S)">☐ 선택</button>
+    <button class="vbtn" data-act="info" id="vInfoBtn" title="정보 보기 (I)">ⓘ 정보</button>
     <button class="vbtn" data-act="slideshow" id="vShowBtn" title="슬라이드쇼 (F5)">▶ 슬라이드쇼</button>
     <button class="vbtn" data-act="full" title="전체 화면 (F)">⛶</button>
     <button class="vbtn" data-act="close" title="닫기 (Esc / Enter)">✕</button>
   </div>
-  <div id="vInfo"></div>
 </div>
 
 <!-- 내보내기/인쇄 공용 대화상자 -->
@@ -175,8 +190,23 @@
       <div id="dlgProgress" class="progress hidden"><div class="bar"><div id="progBar"></div></div><span id="progText"></span></div>
       <div class="spacer"></div>
       <button class="btn" id="dlgCancel">취소</button>
-      <button class="btn" id="dlgPdf">PDF로 저장</button>
+      <span id="printHint" class="hint">PDF로 저장하려면 인쇄 창에서 프린터를 <b>PDF로 저장</b>으로 고르세요.</span>
       <button class="btn primary" id="dlgOk">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 리사이즈 / 이름 바꾸기 대화상자 -->
+<div id="toolModal" class="hidden">
+  <div class="dlg tool-dlg">
+    <div class="dlg-head"><span id="toolTitle"></span><button class="x" id="toolClose">✕</button></div>
+    <div class="dlg-body" id="toolBody"></div>
+    <div class="dlg-foot">
+      <div id="toolProgress" class="progress hidden"><div class="bar"><div id="toolBar"></div></div><span id="toolText"></span></div>
+      <span id="toolMsg" class="tool-msg"></span>
+      <div class="spacer"></div>
+      <button class="btn" id="toolCancel">취소</button>
+      <button class="btn primary" id="toolOk">확인</button>
     </div>
   </div>
 </div>
@@ -184,7 +214,9 @@
 <div id="ctxMenu" class="hidden"></div>
 <div id="toasts"></div>
 
+<script src="api.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
 <script src="app.js"></script>
+<script src="tools.js"></script>
 </body>
 </html>

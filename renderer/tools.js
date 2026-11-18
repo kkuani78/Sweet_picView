@@ -351,3 +351,61 @@ async function reloadKeepSelection(map) {
 }
 
 function refreshTreeNode() { /* 폴더 트리는 다음에 펼칠 때 갱신됨 */ }
+
+
+// ======================= 업데이트 =======================
+const upd = { info: null, busy: false };
+
+async function checkUpdate(manual) {
+  if (upd.busy) return;
+  if (manual) toast('업데이트 확인 중…', { ms: 2500 });
+  try {
+    const info = await api.checkUpdate();
+    upd.info = info;
+    const b = $('#btnUpdate');
+    if (info) {
+      b.textContent = `⬆ 새 버전 ${info.version}`;
+      b.classList.remove('hidden');
+      toast(`새 버전 <b>${esc(info.version)}</b>이 나왔어요. (지금 ${esc(info.current)})`, {
+        ms: 15000, actions: [{ label: '지금 업데이트', run: installUpdate }]
+      });
+    } else {
+      b.classList.add('hidden');
+      if (manual) toast(`최신 버전을 쓰고 있어요 (v${esc(await api.appVersion())})`);
+    }
+  } catch (err) {
+    if (manual) toast('업데이트 정보를 가져오지 못했어요.<br><span style="font-size:12px;color:#a3a9b5">' + esc(String(err)) + '</span>', { error: true });
+  }
+}
+
+async function installUpdate() {
+  if (upd.busy) return;
+  upd.busy = true;
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = '<div id="updText">업데이트 받는 중…</div><div class="t-prog"><div id="updBar"></div></div>';
+  $('#toasts').appendChild(el);
+  const un = await api.onUpdateProgress((got, total) => {
+    if (total) {
+      $('#updBar').style.width = Math.min(100, (got / total) * 100) + '%';
+      $('#updText').textContent = `업데이트 받는 중… ${(got / 1048576).toFixed(1)} / ${(total / 1048576).toFixed(1)} MB`;
+    }
+  });
+  try {
+    await api.installUpdate();
+    $('#updText').textContent = '설치 중… 잠시 후 프로그램이 다시 켜집니다.';
+  } catch (err) {
+    el.remove();
+    toast('업데이트 실패: ' + esc(String(err)), { error: true });
+  } finally {
+    try { un(); } catch {}
+    upd.busy = false;
+  }
+}
+
+$('#btnUpdate').onclick = installUpdate;
+$('#stVer').onclick = () => checkUpdate(true);
+(async () => {
+  try { $('#stVer').textContent = 'v' + (await api.appVersion()); } catch {}
+  setTimeout(() => checkUpdate(false), 3000); // 켜고 3초 뒤 조용히 확인
+})();

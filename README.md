@@ -19,8 +19,17 @@ ACDSee 스타일의 사내용 이미지 뷰어 (Windows). Tauri 기반이라 설
 - **PPT 내보내기**: 슬라이드 한 장당 이미지 수(1~20장 또는 가로×세로 직접 지정), 슬라이드 크기, 여백, 파일명
 - **인쇄**: 종이 한 장당 이미지 수, 용지·방향, 여백, 파일명 (인쇄 창에서 "PDF로 저장" 가능)
 
-## 설치파일 받기
-GitHub **Actions** 탭 → 최근 "Windows 설치파일 빌드" → 아래 **Artifacts**의 `SweetPicView-Setup` 다운로드 → 압축 해제 후 실행.
+## 설치 / 업데이트
+- **처음 설치**: 저장소의 **Releases** → 최신 버전 → `..._x64-setup.exe` 다운로드 후 실행
+- **업데이트**: 앱이 켜질 때 새 버전을 확인해서 위쪽에 **⬆ 새 버전** 버튼을 보여줌 → 누르면 받아서 덮어쓰고 다시 켜짐
+  (아래 상태줄의 버전 표시를 누르면 바로 확인)
+- 설치파일을 직접 실행해도 기존 앱을 지우지 않고 그대로 덮어씀
+- 시험용 빌드: PR의 **Actions** → Artifacts `SweetPicView-Setup`
+
+## 새 버전 내보내기 (개발자용)
+1. `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`의 버전을 올린다
+2. PR → main에 병합 → GitHub Actions가 빌드하고 `v버전` 릴리스를 자동으로 만든다
+3. 업데이트 서명 키: 저장소 Settings → Secrets → `TAURI_SIGNING_PRIVATE_KEY` (잃어버리면 기존 설치본에 업데이트를 보낼 수 없음)
 
 ## 기본 이미지 뷰어로 설정
 앱 상단 **⚙ 기본 뷰어** 버튼 → Windows 기본 앱 설정에서 *Sweet picView* 검색 → 사진 형식(.jpg, .png 등)을 Sweet picView로 변경.
@@ -41,4 +50,5 @@ npm run dist     # 설치파일 빌드
 - `src-tauri/tauri.conf.json` — 앱 이름, 창, 설치파일, 파일 연결 설정
 - `renderer/` — 화면 (index.html, style.css, app.js, tools.js, api.js)
 - `renderer/vendor/pptxgen.bundle.js` — PPT 생성 라이브러리
+- `src-tauri/installer/installer.nsi` — 설치 프로그램 템플릿 (기존 버전을 지우지 않고 덮어쓰도록 수정)
 - `build/icon.png` — 아이콘 원본 (`npx tauri icon build/icon.png -o src-tauri/icons`로 아이콘 생성)

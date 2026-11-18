@@ -241,6 +241,51 @@ fn open_default_apps() -> Result<(), String> {
     tauri_plugin_opener::open_url("ms-settings:defaultapps", None::<&str>).map_err(|e| e.to_string())
 }
 
+// ---------- 업데이트 (GitHub 릴리스) ----------
+#[derive(Serialize)]
+struct UpdateInfo {
+    version: String,
+    current: String,
+    notes: Option<String>,
+}
+
+#[tauri::command]
+fn app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let u = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?;
+    Ok(u.map(|u| UpdateInfo { version: u.version.clone(), current: u.current_version.clone(), notes: u.body.clone() }))
+}
+
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let u = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("이미 최신 버전입니다")?;
+    let mut got: u64 = 0;
+    let app2 = app.clone();
+    u.download_and_install(
+        move |chunk, total| {
+            got += chunk as u64;
+            let _ = app2.emit("update-progress", (got, total.unwrap_or(0)));
+        },
+        || {},
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    // Windows는 설치 프로그램이 실행되면서 앱이 닫히고, 설치 후 다시 켜진다
+    app.restart();
+}
+
 struct LaunchPath(Mutex<Option<String>>);
 
 fn file_arg<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
@@ -327,6 +372,7 @@ fn main() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(LaunchPath(Mutex::new(launch)))
         // localimg://localhost/<경로>  →  실제 이미지 파일
         .register_asynchronous_uri_scheme_protocol("localimg", |_ctx, request, responder| {
@@ -398,6 +444,9 @@ fn main() {
             get_launch_path,
             exif_info,
             pick_folder_for,
+            app_version,
+            check_update,
+            install_update,
             tools::resize_images,
             tools::rename_files
         ])

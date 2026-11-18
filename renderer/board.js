@@ -95,10 +95,23 @@ function fitTo(b, pad = 0.06) {
 const fitAll = () => fitTo(unionBounds(B.items));
 
 // ---------------- 아이템 그리기 ----------------
+const TEXT_COLORS = { '흰색': '#ffffff', '검정': '#111111', '빨강': '#ff4d4f', '노랑': '#ffd23f', '파랑': '#4c9bff', '초록': '#3ddc84' };
+const TEXT_BGS = { '없음': 'transparent', '어두운 상자': 'rgba(0,0,0,.65)', '밝은 상자': 'rgba(255,255,255,.9)' };
+const isText = (it) => it.type === 'text';
+
 function makeEl(it) {
   const el = document.createElement('div');
-  el.className = 'item';
   el.dataset.id = it.id;
+  it.el = el;
+  if (isText(it)) {
+    el.className = 'item text';
+    const tx = document.createElement('div');
+    tx.className = 'tx';
+    tx.textContent = it.text;
+    el.appendChild(tx);
+    return el;
+  }
+  el.className = 'item';
   const img = document.createElement('img');
   img.draggable = false;
   el.appendChild(img);
@@ -111,6 +124,7 @@ function makeEl(it) {
 
 function render(it) {
   const el = it.el;
+  if (isText(it)) { renderText(it); return; }
   el.style.left = (it.cx - it.w / 2) + 'px';
   el.style.top = (it.cy - it.h / 2) + 'px';
   el.style.width = it.w + 'px';
@@ -121,6 +135,22 @@ function render(it) {
   img.style.height = (it.h / c.h) + 'px';
   img.style.left = (-c.x * it.w / c.w) + 'px';
   img.style.top = (-c.y * it.h / c.h) + 'px';
+  el.classList.toggle('sel', B.sel.has(it.id));
+}
+
+// 텍스트: 글자 크기로 상자 크기를 재고(world 단위) 가운데 기준으로 놓는다
+function renderText(it) {
+  const el = it.el, tx = el.firstChild;
+  if (tx.getAttribute('contenteditable') !== 'true' && tx.textContent !== it.text) tx.textContent = it.text;
+  tx.style.fontSize = it.fs + 'px';
+  tx.style.fontWeight = it.bold ? 700 : 400;
+  tx.style.color = it.color;
+  tx.style.background = it.bg;
+  el.style.width = 'auto'; el.style.height = 'auto';
+  el.style.transform = 'none';
+  it.w = Math.max(tx.offsetWidth, it.fs); it.h = Math.max(tx.offsetHeight, it.fs);
+  el.style.left = (it.cx - it.w / 2) + 'px';
+  el.style.top = (it.cy - it.h / 2) + 'px';
   el.classList.toggle('sel', B.sel.has(it.id));
 }
 
@@ -176,12 +206,13 @@ function pushUndo() {
 function restore(s) {
   const data = JSON.parse(s);
   const old = new Map(B.items.map((it) => [it.id, it]));
+  // 같은 id라도 종류가 다르면 새로 그리기
   B.items = data.map((d) => { const o = old.get(d.id); return Object.assign(o || {}, d, { el: o ? o.el : null, hi: o ? o.hi : false }); });
   for (const id of [...B.sel]) if (!byId(id)) B.sel.delete(id);
   renderAll();
   markDirty();
 }
-function undo() { if (!B.undo.length) return; B.redo.push(snap()); restore(B.undo.pop()); }
+function undo() { if (editing) finishEdit(); if (!B.undo.length) return; B.redo.push(snap()); restore(B.undo.pop()); }
 function redo() { if (!B.redo.length) return; B.undo.push(snap()); restore(B.redo.pop()); }
 
 function markDirty() { B.dirty = true; updateTitle(); }
@@ -316,21 +347,22 @@ function sendBack() {
   B.items = moving.concat(B.items.filter((it) => !B.sel.has(it.id)));
   renderAll();
 }
+const selImages = () => selItems().filter((it) => !isText(it));
 function rotateSel(d) {
-  const s = selItems(); if (!s.length) return;
+  const s = selImages(); if (!s.length) return;
   pushUndo();
   s.forEach((it) => { it.rot = ((it.rot + d) % 360 + 360) % 360; });
   renderAll();
 }
 function flipSel(axis) {
-  const s = selItems(); if (!s.length) return;
+  const s = selImages(); if (!s.length) return;
   pushUndo();
   // 회전된 상태에서도 화면 기준으로 뒤집히도록
   s.forEach((it) => { const swap = it.rot % 180 !== 0; if ((axis === 'h') !== swap) it.fh = !it.fh; else it.fv = !it.fv; });
   renderAll();
 }
 function resetSel() {
-  const s = selItems(); if (!s.length) return;
+  const s = selImages(); if (!s.length) return;
   pushUndo();
   s.forEach((it) => {
     const c = srcCache.get(it.id);
@@ -368,9 +400,77 @@ function arrange(list = selItems().length > 1 ? selItems() : B.items, record = t
   renderAll();
 }
 
+// ---------------- 텍스트 메모 ----------------
+let editing = null; // 편집 중인 텍스트 id
+function addText(screenPt) {
+  const r = stage.getBoundingClientRect();
+  const p = screenPt ? toWorld(screenPt.x, screenPt.y) : toWorld(r.left + r.width / 2, r.top + r.height / 2);
+  const last = store.textStyle;
+  const it = {
+    id: B.nextId++, type: 'text', text: '', name: '메모',
+    cx: p.x, cy: p.y, w: 10, h: 10, fs: 28 / B.view.z,
+    color: last.color, bg: last.bg, bold: last.bold,
+    rot: 0, fh: false, fv: false, crop: { x: 0, y: 0, w: 1, h: 1 }
+  };
+  pushUndo();
+  B.items.push(it);
+  B.sel = new Set([it.id]);
+  renderAll();
+  startEdit(it, true);
+}
+function startEdit(it, isNew) {
+  if (!it || !isText(it)) return;
+  if (editing) finishEdit();
+  if (!isNew) pushUndo();
+  editing = it.id;
+  const tx = it.el.firstChild;
+  tx.setAttribute('contenteditable', 'true');
+  tx.focus();
+  const range = document.createRange(); range.selectNodeContents(tx);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  updateSelBox();
+}
+function finishEdit() {
+  if (!editing) return;
+  const it = byId(editing);
+  editing = null;
+  if (!it) return;
+  const tx = it.el.firstChild;
+  tx.removeAttribute('contenteditable');
+  it.text = tx.innerText.replace(/\n$/, '');
+  window.getSelection().removeAllRanges();
+  if (!it.text.trim()) {
+    B.items = B.items.filter((x) => x !== it);
+    B.sel.delete(it.id);
+  }
+  renderAll();
+  markDirty();
+}
+document.addEventListener('input', (e) => {
+  if (!editing || !e.target.closest('.tx')) return;
+  const it = byId(editing); if (!it) return;
+  it.text = e.target.innerText;
+  renderText(it); updateSelBox();
+});
+// 텍스트 꾸미기 (선택한 메모 전부)
+const store = { get textStyle() { try { return JSON.parse(localStorage.getItem('sref.text')) || { color: '#ffffff', bg: 'transparent', bold: false }; } catch { return { color: '#ffffff', bg: 'transparent', bold: false }; } } };
+function styleText(patch) {
+  const s = selItems().filter(isText); if (!s.length) return;
+  pushUndo();
+  s.forEach((it) => {
+    if (patch.fsMul) it.fs *= patch.fsMul;
+    if (patch.color) it.color = patch.color;
+    if (patch.bg) it.bg = patch.bg;
+    if (patch.bold !== undefined) it.bold = patch.bold === 'toggle' ? !it.bold : patch.bold;
+  });
+  const f = s[0];
+  try { localStorage.setItem('sref.text', JSON.stringify({ color: f.color, bg: f.bg, bold: f.bold })); } catch {}
+  renderAll();
+}
+
 // ---------------- 자르기 ----------------
 function startCrop(it) {
-  if (!it) return;
+  if (!it || isText(it)) return;
   B.crop = it.id;
   B.sel = new Set([it.id]);
   stage.classList.add('crop');
@@ -412,7 +512,7 @@ function applyCrop(it, a, b) {
   renderAll();
 }
 function resetCrop() {
-  const s = selItems().filter((it) => it.crop.w < 1 || it.crop.h < 1); if (!s.length) return;
+  const s = selImages().filter((it) => it.crop.w < 1 || it.crop.h < 1); if (!s.length) return;
   pushUndo();
   for (const it of s) {
     const c = it.crop;
@@ -430,6 +530,9 @@ let spaceDown = false;
 
 stage.addEventListener('pointerdown', (e) => {
   hideMenu();
+  if (editing && e.target.closest('.tx[contenteditable="true"]')) return;
+  if (editing) finishEdit();
+  downPt = e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
   const wpt = toWorld(e.clientX, e.clientY);
   // 화면 이동: 가운데 버튼 또는 Space+왼쪽
   if (e.button === 1 || (e.button === 0 && spaceDown)) {
@@ -457,7 +560,7 @@ stage.addEventListener('pointerdown', (e) => {
     pushUndo();
     drag = {
       kind: 'scale', ax, ay, d0: Math.hypot(wpt.x - ax, wpt.y - ay) || 1,
-      orig: selItems().map((it) => ({ it, cx: it.cx, cy: it.cy, w: it.w, h: it.h }))
+      orig: selItems().map((it) => ({ it, cx: it.cx, cy: it.cy, w: it.w, h: it.h, fs: it.fs }))
     };
     stage.setPointerCapture(e.pointerId);
     return;
@@ -503,6 +606,7 @@ stage.addEventListener('pointermove', (e) => {
     drag.orig.forEach((o) => {
       o.it.cx = drag.ax + (o.cx - drag.ax) * f; o.it.cy = drag.ay + (o.cy - drag.ay) * f;
       o.it.w = o.w * f; o.it.h = o.h * f;
+      if (isText(o.it)) o.it.fs = Math.max(2, o.fs * f);
       render(o.it);
     });
     updateSelBox();
@@ -546,7 +650,7 @@ function endDrag(e) {
   drag = null;
   updateSelBox();
 }
-stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointerup', (e) => { const wasCrop = B.crop; endDrag(e); if (!wasCrop && !spaceDown) checkDouble(e); downPt = null; });
 stage.addEventListener('pointercancel', endDrag);
 
 stage.addEventListener('wheel', (e) => {
@@ -556,24 +660,44 @@ stage.addEventListener('wheel', (e) => {
   zoomAt(Math.pow(1.0015, -d), e.clientX, e.clientY);
 }, { passive: false });
 
-stage.addEventListener('dblclick', (e) => {
+// 더블클릭: 이미지가 맨 앞으로 오면서 요소 순서가 바뀌면 브라우저가 더블클릭으로 안 쳐 주므로 직접 판단
+let downPt = null, lastClick = null;
+// 버튼을 뗄 때: 움직이지 않은 클릭이 0.4초 안에 같은 자리에서 두 번이면 더블클릭
+function checkDouble(e) {
+  if (!downPt || e.button !== 0 || Math.hypot(e.clientX - downPt.x, e.clientY - downPt.y) > 4) { lastClick = null; return; }
+  const now = performance.now();
+  if (lastClick && now - lastClick.t < 400 && Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 6) {
+    lastClick = null;
+    onDouble(e);
+  } else lastClick = { t: now, x: e.clientX, y: e.clientY };
+}
+function onDouble(e) {
   if (B.crop) return;
-  const itemEl = e.target.closest('.item');
-  if (itemEl) fitTo(bounds(byId(+itemEl.dataset.id)), 0.03);
-  else fitAll();
-});
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const itemEl = under && under.closest('.item');
+  if (itemEl) {
+    const it = byId(+itemEl.dataset.id);
+    if (!it) return;
+    if (isText(it)) startEdit(it); else fitTo(bounds(it), 0.03);
+  } else fitAll();
+}
 
 // ---------------- 오른쪽 클릭 메뉴 ----------------
+let menuPt = null;
 stage.addEventListener('contextmenu', (e) => {
   e.preventDefault();
+  if (editing) finishEdit();
+  menuPt = { x: e.clientX, y: e.clientY };
   const itemEl = e.target.closest('.item');
   if (itemEl && !B.sel.has(+itemEl.dataset.id)) { B.sel = new Set([+itemEl.dataset.id]); renderAll(); }
-  const has = B.sel.size > 0, multi = B.sel.size > 1, one = B.sel.size === 1;
+  const has = B.sel.size > 0, multi = B.sel.size > 1, one = B.sel.size === 1 && !isText(selItems()[0]);
+  const hasImg = selImages().length > 0, hasText = selItems().some(isText);
   const cropped = selItems().some((it) => it.crop.w < 1 || it.crop.h < 1);
   const op = Math.round(B.opacity * 100);
   showMenu(e.clientX, e.clientY, [
     ['이미지 열기…', '', () => pickImages()],
     ['붙여넣기', 'Ctrl+V', pasteFromClipboard],
+    ['텍스트 메모 추가', 'Ctrl+T', () => addText(menuPt)],
     null,
     ['전체 보기', 'F', fitAll],
     ['자동 정렬', 'Ctrl+P', () => arrange()],
@@ -591,8 +715,18 @@ stage.addEventListener('contextmenu', (e) => {
       ['높이 맞추기', '', () => matchSize('h'), !multi],
       ['너비 맞추기', '', () => matchSize('w'), !multi],
       ['맨 뒤로 보내기', '', sendBack, !has]
-    ], !has],
-    ['이미지 복사', 'Ctrl+C', copySel, !one],
+    ], !hasImg],
+    ['텍스트', '', [
+      ['글 고치기', 'Enter', () => startEdit(selItems().find(isText)), !hasText],
+      ['굵게 / 보통', '', () => styleText({ bold: 'toggle' })],
+      ['글자 크게', '', () => styleText({ fsMul: 1.25 })],
+      ['글자 작게', '', () => styleText({ fsMul: 0.8 })],
+      null,
+      ...Object.entries(TEXT_COLORS).map(([n, c]) => ['글자색: ' + n, '', () => styleText({ color: c })]),
+      null,
+      ...Object.entries(TEXT_BGS).map(([n, c]) => ['배경: ' + n, '', () => styleText({ bg: c })])
+    ], !hasText],
+    ['복사', 'Ctrl+C', copySel, !(B.sel.size === 1)],
     ['삭제', 'Delete', removeSel, !has],
     null,
     ['보기', '', [
@@ -688,6 +822,10 @@ function setOpacity(v) {
 // ---------------- 키보드 ----------------
 document.addEventListener('keydown', (e) => {
   if (!$('#dlg').classList.contains('hidden')) return;
+  if (editing) {
+    if (e.key === 'Escape' || (e.key === 'Enter' && e.ctrlKey)) { e.preventDefault(); finishEdit(); }
+    return;
+  }
   if (!$('#help').classList.contains('hidden')) { $('#help').classList.add('hidden'); e.preventDefault(); return; }
   if (document.querySelector('.menu') && e.key === 'Escape') { hideMenu(); return; }
   const k = e.key, low = k.length === 1 ? k.toLowerCase() : k, ctrl = e.ctrlKey || e.metaKey;
@@ -702,6 +840,8 @@ document.addEventListener('keydown', (e) => {
   if (ctrl && low === 'o') { e.preventDefault(); openBoardDialog(); return; }
   if (ctrl && low === 'p') { e.preventDefault(); arrange(); return; }
   if (ctrl && low === 'c') { e.preventDefault(); copySel(); return; }
+  if (ctrl && low === 't') { e.preventDefault(); addText(lastPointer); return; }
+  if (k === 'Enter' && B.sel.size === 1 && isText(selItems()[0])) { e.preventDefault(); startEdit(selItems()[0]); return; }
   if (ctrl) return; // Ctrl+V는 paste 이벤트에서
   if (k === 'Delete' || k === 'Backspace') { removeSel(); return; }
   if (k === 'F1' || k === '?') { e.preventDefault(); $('#help').classList.remove('hidden'); return; }
@@ -729,6 +869,12 @@ $('#help').addEventListener('pointerdown', () => $('#help').classList.add('hidde
 let lastPointer = null;
 stage.addEventListener('pointermove', (e) => { lastPointer = { x: e.clientX, y: e.clientY }; });
 document.addEventListener('paste', (e) => {
+  if (editing) {
+    e.preventDefault();
+    const t = e.clipboardData?.getData('text/plain') || '';
+    if (t) document.execCommand('insertText', false, t);
+    return;
+  }
   const files = Array.from(e.clipboardData?.files || []);
   if (files.length) { e.preventDefault(); addBlobs(files, lastPointer); return; }
   const items = Array.from(e.clipboardData?.items || []).filter((i) => i.type.startsWith('image/')).map((i) => i.getAsFile()).filter(Boolean);
@@ -744,6 +890,7 @@ async function pasteFromClipboard() {
 }
 async function copySel() {
   const it = selItems()[0]; if (!it) return;
+  if (isText(it)) { try { await navigator.clipboard.writeText(it.text); toast('글자를 복사했습니다'); } catch {} return; }
   try {
     const c = srcCache.get(it.id);
     const im = await loadImg(c.full);
@@ -797,7 +944,9 @@ async function saveBoard(asNew) {
   toast('저장 중…', 60000);
   try {
     const keys = new Map(); const parts = []; const metas = [];
+    if (editing) finishEdit();
     for (const it of B.items) {
+      if (isText(it)) continue;
       const key = it.src.blob || it.src.path;
       if (!keys.has(key)) {
         const { bytes, mime } = await sourceBytes(it);
@@ -808,7 +957,9 @@ async function saveBoard(asNew) {
     const json = JSON.stringify({
       version: 1, view: B.view, gray: B.gray,
       blobs: metas,
-      items: B.items.map((it) => ({ b: keys.get(it.src.blob || it.src.path), name: it.name, cx: it.cx, cy: it.cy, w: it.w, h: it.h, rot: it.rot, fh: it.fh, fv: it.fv, crop: it.crop }))
+      items: B.items.map((it) => isText(it)
+        ? { type: 'text', text: it.text, cx: it.cx, cy: it.cy, fs: it.fs, color: it.color, bg: it.bg, bold: !!it.bold }
+        : { b: keys.get(it.src.blob || it.src.path), name: it.name, cx: it.cx, cy: it.cy, w: it.w, h: it.h, rot: it.rot, fh: it.fh, fv: it.fv, crop: it.crop })
     });
     const enc = new TextEncoder();
     const jb = enc.encode(json);
@@ -855,6 +1006,10 @@ async function openBoardFile(path, skipConfirm) {
     clearBoard();
     const infos = await Promise.all(ids.map((id) => prepare(URL.createObjectURL(blobs.get(id).blob)).catch(() => null)));
     for (const d of meta.items) {
+      if (d.type === 'text') {
+        B.items.push({ id: B.nextId++, type: 'text', text: d.text || '', name: '메모', cx: d.cx, cy: d.cy, w: 10, h: 10, fs: d.fs || 24, color: d.color || '#ffffff', bg: d.bg || 'transparent', bold: !!d.bold, rot: 0, fh: false, fv: false, crop: { x: 0, y: 0, w: 1, h: 1 } });
+        continue;
+      }
       const info = infos[d.b]; if (!info) continue;
       const it = newItem({ blob: ids[d.b] }, d.name, info, { x: 0, y: 0 });
       Object.assign(it, { cx: d.cx, cy: d.cy, w: d.w, h: d.h, rot: d.rot || 0, fh: !!d.fh, fv: !!d.fv, crop: d.crop || { x: 0, y: 0, w: 1, h: 1 } });
@@ -906,4 +1061,4 @@ window.addEventListener('resize', () => updateSelBox());
   } catch {}
 })();
 
-window.__board = { B, addPaths, addBlobs, arrange, fitAll, undo, redo, rotateSel, flipSel, startCrop, applyCrop, resetCrop, saveBoard, openBoardFile, matchSize, localUV, toWorld, toScreen, selItems, removeSel, setOpacity };
+window.__board = { addText, startEdit, finishEdit, styleText, B, addPaths, addBlobs, arrange, fitAll, undo, redo, rotateSel, flipSel, startCrop, applyCrop, resetCrop, saveBoard, openBoardFile, matchSize, localUV, toWorld, toScreen, selItems, removeSel, setOpacity };

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' localimg: blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' localimg: blob: data:">
+<title>PicView</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <!-- 상단 툴바 -->
+  <header id="toolbar">
+    <div class="tb-group">
+      <button id="btnOpen" class="btn" title="폴더 열기 (Ctrl+O)">📂 폴더 열기</button>
+      <button id="btnUp" class="btn icon" title="상위 폴더 (Backspace)">⬆</button>
+      <button id="btnRefresh" class="btn icon" title="새로고침 (F5)">⟳</button>
+    </div>
+    <input id="pathBar" class="path" spellcheck="false" placeholder="폴더 경로를 입력하고 Enter">
+    <div class="tb-group">
+      <label class="chk" title="하위 폴더의 이미지까지 모두 표시"><input type="checkbox" id="chkRecursive"> 하위 폴더 포함</label>
+      <input id="search" class="search" placeholder="🔍 파일명 검색">
+      <select id="sortBy" class="sel" title="정렬">
+        <option value="name">이름순</option>
+        <option value="mtime">수정 날짜순</option>
+        <option value="size">파일 크기순</option>
+        <option value="type">형식순</option>
+      </select>
+      <button id="btnSortDir" class="btn icon" title="오름차순/내림차순">↑</button>
+      <input id="thumbSize" type="range" min="80" max="320" value="160" title="썸네일 크기">
+    </div>
+  </header>
+
+  <!-- 선택 / 작업 툴바 -->
+  <div id="actionbar">
+    <div class="tb-group">
+      <button id="btnSelAll" class="btn" title="모두 선택 (Ctrl+A)">☑ 모두 선택</button>
+      <button id="btnSelNone" class="btn" title="선택 해제 (Esc)">☐ 선택 해제</button>
+      <button id="btnSelInvert" class="btn" title="선택 반전 (Ctrl+I)">⇄ 선택 반전</button>
+      <span class="hint">클릭 · Ctrl+클릭(추가) · Shift+클릭(범위) · 빈 곳 드래그(영역 선택)</span>
+    </div>
+    <div class="tb-group">
+      <span id="selInfo" class="sel-info">선택 없음</span>
+      <button id="btnPpt" class="btn primary" title="선택한 이미지를 PowerPoint로 (Ctrl+E)">📊 PPT로 내보내기</button>
+      <button id="btnPrint" class="btn primary" title="선택한 이미지 인쇄 (Ctrl+P)">🖨 인쇄</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- 왼쪽: 폴더 트리 + 미리보기 -->
+    <aside id="sidebar">
+      <div id="tree"></div>
+      <div id="splitter"></div>
+      <div id="preview">
+        <div id="previewImgWrap"><img id="previewImg" alt=""></div>
+        <div id="previewInfo"></div>
+      </div>
+    </aside>
+
+    <!-- 가운데: 썸네일 -->
+    <section id="gridWrap" tabindex="0">
+      <div id="grid"></div>
+      <div id="empty">
+        <div class="empty-icon">🖼</div>
+        <div>왼쪽에서 폴더를 고르거나 <b>📂 폴더 열기</b>를 누르세요.</div>
+        <div class="sub">폴더나 이미지를 이 창으로 끌어다 놓아도 됩니다.</div>
+      </div>
+      <div id="rubber"></div>
+    </section>
+  </div>
+
+  <footer id="statusbar">
+    <span id="stCount"></span>
+    <span id="stSel"></span>
+    <span id="stPath"></span>
+  </footer>
+</div>
+
+<!-- 전체 화면 뷰어 -->
+<div id="viewer" class="hidden">
+  <div id="vStage"><img id="vImg" alt="" draggable="false"></div>
+  <div id="vTop">
+    <span id="vName"></span>
+    <span id="vCounter"></span>
+  </div>
+  <div id="vBar">
+    <button class="vbtn" data-act="prev" title="이전 (← / Backspace)">◀</button>
+    <button class="vbtn" data-act="next" title="다음 (→ / Space)">▶</button>
+    <span class="vsep"></span>
+    <button class="vbtn" data-act="zoomOut" title="축소 (-)">－</button>
+    <span id="vZoom">100%</span>
+    <button class="vbtn" data-act="zoomIn" title="확대 (+)">＋</button>
+    <button class="vbtn" data-act="fit" title="화면에 맞춤 (0)">맞춤</button>
+    <button class="vbtn" data-act="actual" title="실제 크기 (1)">1:1</button>
+    <span class="vsep"></span>
+    <button class="vbtn" data-act="rotL" title="왼쪽으로 회전 (L)">⟲</button>
+    <button class="vbtn" data-act="rotR" title="오른쪽으로 회전 (R)">⟳</button>
+    <span class="vsep"></span>
+    <button class="vbtn" data-act="select" id="vSelBtn" title="선택/해제 (S)">☐ 선택</button>
+    <button class="vbtn" data-act="slideshow" id="vShowBtn" title="슬라이드쇼 (F5)">▶ 슬라이드쇼</button>
+    <button class="vbtn" data-act="full" title="전체 화면 (F)">⛶</button>
+    <button class="vbtn" data-act="close" title="닫기 (Esc / Enter)">✕</button>
+  </div>
+  <div id="vInfo"></div>
+</div>
+
+<!-- 내보내기/인쇄 공용 대화상자 -->
+<div id="modal" class="hidden">
+  <div class="dlg">
+    <div class="dlg-head"><span id="dlgTitle"></span><button class="x" id="dlgClose">✕</button></div>
+    <div class="dlg-body">
+      <div class="dlg-left">
+        <div id="dlgTarget" class="target"></div>
+
+        <div class="field">
+          <label id="perLabel">한 장에 넣을 이미지 수</label>
+          <div id="perBtns" class="chips"></div>
+          <div class="custom-row">
+            <label class="chk"><input type="checkbox" id="customGrid"> 직접 지정</label>
+            <span id="customInputs" class="dim">
+              가로 <input type="number" id="gCols" min="1" max="10" value="3"> ×
+              세로 <input type="number" id="gRows" min="1" max="10" value="2"> 칸
+            </span>
+          </div>
+        </div>
+
+        <div class="field" id="fSlideSize">
+          <label>슬라이드 크기</label>
+          <select id="slideSize" class="sel">
+            <option value="16x9">와이드 16:9</option>
+            <option value="4x3">표준 4:3</option>
+            <option value="a4l">A4 가로</option>
+            <option value="a4p">A4 세로</option>
+          </select>
+        </div>
+
+        <div class="field" id="fPaper">
+          <label>용지</label>
+          <div class="row2">
+            <select id="paper" class="sel">
+              <option value="A4">A4</option>
+              <option value="A3">A3</option>
+              <option value="B5">B5</option>
+              <option value="Letter">Letter</option>
+            </select>
+            <select id="orient" class="sel">
+              <option value="portrait">세로</option>
+              <option value="landscape">가로</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>여백</label>
+          <select id="margin" class="sel">
+            <option value="none">없음</option>
+            <option value="narrow">좁게</option>
+            <option value="normal" selected>보통</option>
+            <option value="wide">넓게</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="chk"><input type="checkbox" id="caption"> 이미지 아래에 파일명 표시</label>
+          <label class="chk"><input type="checkbox" id="fillCell"> 칸을 꽉 채우기 (잘림 허용)</label>
+          <label class="chk" id="fOptimize"><input type="checkbox" id="optimize" checked> 파일 용량 줄이기 (긴 변 2000px)</label>
+        </div>
+      </div>
+
+      <div class="dlg-right">
+        <div class="pv-head"><span>미리보기 (첫 장)</span><span id="pvPages"></span></div>
+        <div id="pvBox"><div id="pvPage"></div></div>
+      </div>
+    </div>
+    <div class="dlg-foot">
+      <div id="dlgProgress" class="progress hidden"><div class="bar"><div id="progBar"></div></div><span id="progText"></span></div>
+      <div class="spacer"></div>
+      <button class="btn" id="dlgCancel">취소</button>
+      <button class="btn" id="dlgPdf">PDF로 저장</button>
+      <button class="btn primary" id="dlgOk">확인</button>
+    </div>
+  </div>
+</div>
+
+<div id="ctxMenu" class="hidden"></div>
+<div id="toasts"></div>
+
+<script src="vendor/pptxgen.bundle.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

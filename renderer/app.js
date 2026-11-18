@@ -58,11 +58,16 @@ function toast(msg, opts = {}) {
 async function buildTree() {
   const tree = $('#tree');
   tree.innerHTML = '';
+  const favBox = document.createElement('div');
+  favBox.id = 'favs';
+  tree.appendChild(favBox);
+  renderFavs();
+  const sep0 = document.createElement('div'); sep0.className = 'tree-sep'; tree.appendChild(sep0);
   const roots = await api.getRoots();
   let sepAdded = false;
   for (const r of roots) {
     if (r.kind === 'drive' && !sepAdded) { const s = document.createElement('div'); s.className = 'tree-sep'; tree.appendChild(s); sepAdded = true; }
-    tree.appendChild(makeNode(r.label, r.path, 0, r.kind === 'drive' ? '💽' : '⭐'));
+    tree.appendChild(makeNode(r.label, r.path, 0, r.kind === 'drive' ? '💽' : '📂'));
   }
 }
 
@@ -98,6 +103,81 @@ function makeNode(label, p, depth, icon = '📁') {
   return wrap;
 }
 
+// ---------------- 폴더 즐겨찾기 ----------------
+const favs = { list: store.get('favorites', []) }; // [{ path, name }]
+const normPath = (p) => (p || '').replace(/[\\/]+$/, '').toLowerCase();
+const isFav = (p) => !!p && favs.list.some((f) => normPath(f.path) === normPath(p));
+
+function saveFavs() {
+  store.set('favorites', favs.list);
+  renderFavs();
+  updateStar();
+}
+function addFav(p) {
+  if (!p || isFav(p)) return;
+  favs.list.push({ path: p, name: baseName(p) });
+  saveFavs();
+  toast(`★ 즐겨찾기에 추가했어요: <b>${esc(baseName(p))}</b>`, { ms: 2500 });
+}
+function removeFav(p) {
+  favs.list = favs.list.filter((f) => normPath(f.path) !== normPath(p));
+  saveFavs();
+  toast(`즐겨찾기에서 뺐어요: <b>${esc(baseName(p))}</b>`, { ms: 2500 });
+}
+function toggleFav(p = state.folder) {
+  if (!p) { toast('먼저 폴더를 여세요.', { error: true }); return; }
+  isFav(p) ? removeFav(p) : addFav(p);
+}
+function moveFav(p, d) {
+  const i = favs.list.findIndex((f) => normPath(f.path) === normPath(p));
+  const j = i + d;
+  if (i < 0 || j < 0 || j >= favs.list.length) return;
+  [favs.list[i], favs.list[j]] = [favs.list[j], favs.list[i]];
+  saveFavs();
+}
+function renderFavs() {
+  const box = $('#favs');
+  if (!box) return;
+  box.innerHTML = '<div class="tree-head">★ 즐겨찾기</div>';
+  if (!favs.list.length) {
+    box.insertAdjacentHTML('beforeend', '<div class="fav-empty">폴더를 열고 ☆ 버튼이나 Ctrl+D</div>');
+    return;
+  }
+  for (const f of favs.list) {
+    const n = makeNode(f.name, f.path, 0, '★');
+    n.firstChild.classList.add('fav');
+    n.firstChild.dataset.fav = '1';
+    box.appendChild(n);
+  }
+  markTreeActive();
+}
+function updateStar() {
+  const b = $('#btnFav');
+  const on = isFav(state.folder);
+  b.textContent = on ? '★' : '☆';
+  b.classList.toggle('on', on);
+  b.title = on ? '즐겨찾기에서 빼기 (Ctrl+D)' : '이 폴더를 즐겨찾기에 추가 (Ctrl+D)';
+}
+
+// 폴더 트리 오른쪽 클릭
+$('#tree').addEventListener('contextmenu', (e) => {
+  const node = e.target.closest('.node');
+  if (!node) return;
+  e.preventDefault();
+  const p = node.dataset.path;
+  const items = [
+    ['열기', '', () => openFolder(p)],
+    ['탐색기에서 열기', '', () => api.openPath(p)],
+    null,
+    [isFav(p) ? '★ 즐겨찾기에서 빼기' : '☆ 즐겨찾기에 추가', '', () => toggleFav(p)]
+  ];
+  if (node.dataset.fav && favs.list.length > 1) {
+    items.push(['위로', '', () => moveFav(p, -1)]);
+    items.push(['아래로', '', () => moveFav(p, 1)]);
+  }
+  renderMenu(e.clientX, e.clientY, items);
+});
+
 function markTreeActive() {
   document.querySelectorAll('.node.active').forEach((n) => n.classList.remove('active'));
   if (!state.folder) return;
@@ -127,6 +207,7 @@ async function openFolder(p, focusPath, opts = {}) {
   thumbQueue.length = 0;
   applyView();
   markTreeActive();
+  updateStar();
   if (focusPath) {
     const i = state.view.findIndex((x) => x.path === focusPath);
     if (i >= 0) { setFocus(i); selectOnly(i); }
@@ -436,7 +517,6 @@ gridWrap.addEventListener('contextmenu', (e) => {
 
 // ---------------- 우클릭 메뉴 ----------------
 function showContextMenu(x, y, onTile) {
-  const m = $('#ctxMenu');
   const item = state.view[state.focus];
   const n = state.selected.size;
   const items = [];
@@ -467,6 +547,16 @@ function showContextMenu(x, y, onTile) {
     items.push([`선택한 ${n}개 PPT로 내보내기`, 'Ctrl+E', () => openDialog('ppt')]);
     items.push([`선택한 ${n}개 인쇄`, 'Ctrl+P', () => openDialog('print')]);
   }
+  if (state.folder) {
+    items.push(null);
+    items.push([isFav(state.folder) ? '★ 이 폴더를 즐겨찾기에서 빼기' : '☆ 이 폴더를 즐겨찾기에 추가', 'Ctrl+D', () => toggleFav()]);
+  }
+  renderMenu(x, y, items);
+}
+
+// items: [이름, 단축키, 실행] 또는 null(구분선)
+function renderMenu(x, y, items) {
+  const m = $('#ctxMenu');
   m.innerHTML = '';
   for (const it of items) {
     if (!it) { const s = document.createElement('div'); s.className = 'ms'; m.appendChild(s); continue; }
@@ -514,6 +604,7 @@ document.addEventListener('keydown', (e) => {
   const inInput = ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && e.target.type !== 'checkbox' && e.target.type !== 'range';
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && e.key.toLowerCase() === 'o') { e.preventDefault(); pickFolder(); return; }
+  if (ctrl && e.key.toLowerCase() === 'd') { e.preventDefault(); toggleFav(); return; }
   if (ctrl && e.key.toLowerCase() === 'f') { e.preventDefault(); $('#search').focus(); $('#search').select(); return; }
   if (e.key === 'F5') { e.preventDefault(); openFolder(state.folder); return; }
   if (inInput) return;
@@ -1359,6 +1450,7 @@ async function goUp() { if (!state.folder) return; const p = await api.parentDir
 $('#btnOpen').onclick = pickFolder;
 $('#btnUp').onclick = goUp;
 $('#btnRefresh').onclick = () => openFolder(state.folder);
+$('#btnFav').onclick = () => toggleFav();
 $('#pathBar').addEventListener('keydown', (e) => { if (e.key === 'Enter') { openFolder(e.target.value.trim()); } });
 $('#search').addEventListener('input', (e) => { state.query = e.target.value; state.selected.clear(); state.focus = -1; applyView(); });
 $('#sortBy').addEventListener('change', (e) => { state.sortBy = e.target.value; store.set('sortBy', state.sortBy); applyView(); });

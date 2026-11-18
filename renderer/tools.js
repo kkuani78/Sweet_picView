@@ -446,6 +446,7 @@ function openTransfer() {
         <option value="dest">선택한 폴더 안</option>
       </select>
     </div>
+    ${favs.list.length ? `<div class="trow"><span class="tl">★ 즐겨찾기</span><div class="recent">${favs.list.map((f, i) => `<span class="chip2 favchip" data-f="${i}" title="${esc(f.path)}">★ ${esc(f.name)}</span>`).join('')}</div></div>` : ''}
     ${recent.length ? `<div class="trow"><span class="tl">최근 폴더</span><div class="recent">${recent.map((r, i) => `<span class="chip2" data-i="${i}" title="${esc(r)}">${esc(r)}</span>`).join('')}</div></div>` : ''}
     <div class="trow"><span class="tl">같은 이름이 있으면</span>
       <select id="tfConflict" class="sel">
@@ -463,7 +464,7 @@ function openTransfer() {
     if (f) { tool.dest = f; if ($('#tfNewBase').value !== 'dest') document.querySelector('input[name=tfWhere][value=exist]').checked = true; syncTransfer(); }
   };
   $('#toolBody').querySelectorAll('.chip2').forEach((c) => c.onclick = () => {
-    tool.dest = recent[+c.dataset.i];
+    tool.dest = c.dataset.f !== undefined ? favs.list[+c.dataset.f].path : recent[+c.dataset.i];
     document.querySelector('input[name=tfWhere][value=exist]').checked = true;
     syncTransfer();
   });

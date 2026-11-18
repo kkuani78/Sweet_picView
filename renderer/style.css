@@ -212,3 +212,9 @@ input[type=range] { width: 110px; accent-color: var(--accent); }
 .pnote { color: var(--fg3); font-size: 12px; }
 @media (max-width: 1560px) { #actionbar .hint { display: none; } }
 @media (max-width: 1250px) { .seg-lbl { display: none; } }
+
+#stVer { color: var(--fg3); cursor: pointer; white-space: nowrap; }
+#stVer:hover { color: var(--accent); text-decoration: underline; }
+#stPath { margin-left: auto; }
+.toast .t-prog { margin-top: 8px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.toast .t-prog div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }

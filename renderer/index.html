@@ -27,6 +27,7 @@
       <button id="btnSortDir" class="btn icon" title="오름차순/내림차순">↑</button>
       <input id="thumbSize" type="range" min="80" max="320" value="160" title="썸네일 크기">
       <button id="btnDefault" class="btn icon" title="Sweet picView를 기본 이미지 뷰어로 설정">⚙ 기본 뷰어</button>
+      <button id="btnUpdate" class="btn primary hidden" title="새 버전으로 업데이트">⬆ 업데이트</button>
     </div>
   </header>
 
@@ -81,6 +82,7 @@
     <span id="stCount"></span>
     <span id="stSel"></span>
     <span id="stPath"></span>
+    <span id="stVer" title="눌러서 업데이트 확인"></span>
   </footer>
 </div>
 
@@ -93,19 +95,16 @@
     <span id="vCounter"></span>
   </div>
   <div id="vBar">
-    <button class="vbtn" data-act="prev" title="이전 (← / Backspace)">◀</button>
-    <button class="vbtn" data-act="next" title="다음 (→ / Space)">▶</button>
+    <button class="vbtn" data-act="zoomOut" title="축소 (- 키)">－</button>
+    <span id="vZoom">100%</span>
+    <button class="vbtn" data-act="zoomIn" title="확대 (= 키)">＋</button>
+    <button class="vbtn" data-act="fit" title="화면에 맞춤 (0)">맞춤</button>
+    <button class="vbtn" data-act="actual" title="실제 크기 (Z)">1:1</button>
     <span class="vsep"></span>
     <button class="vbtn lay" data-act="lay1" title="1장 보기 (1)">▢ 1장</button>
     <button class="vbtn lay" data-act="lay2" title="2장 보기 (2)">◫ 2장</button>
     <button class="vbtn lay" data-act="lay4" title="4장 보기 (4)">⊞ 4장</button>
     <button class="vbtn" data-act="selOnly" id="vSelOnlyBtn" title="선택한 이미지만 보기 (O)">선택만</button>
-    <span class="vsep"></span>
-    <button class="vbtn" data-act="zoomOut" title="축소 (-)">－</button>
-    <span id="vZoom">100%</span>
-    <button class="vbtn" data-act="zoomIn" title="확대 (+)">＋</button>
-    <button class="vbtn" data-act="fit" title="화면에 맞춤 (0)">맞춤</button>
-    <button class="vbtn" data-act="actual" title="실제 크기 (Z)">1:1</button>
     <span class="vsep"></span>
     <button class="vbtn" data-act="rotL" title="왼쪽으로 회전 (L)">⟲</button>
     <button class="vbtn" data-act="rotR" title="오른쪽으로 회전 (R)">⟳</button>

@@ -884,6 +884,7 @@ async function confirmDiscard() {
 
 // ---------------- 창 ----------------
 $('#bPin').onclick = toggleOnTop;
+$('#bViewer').onclick = () => inv('show_main');
 $('#bMin').onclick = () => W.minimize();
 $('#bMax').onclick = () => W.toggleMaximize();
 $('#bClose').onclick = async () => { if (await confirmDiscard()) W.destroy(); };

@@ -349,13 +349,37 @@ fn board_take_pending(state: tauri::State<BoardPending>) -> (Vec<String>, Option
     state.0.lock().map(|mut g| std::mem::take(&mut *g)).unwrap_or_default()
 }
 
-#[tauri::command]
-fn show_main(app: AppHandle) {
+/// 뷰어(메인) 창을 보이게. 닫혀서 없으면 새로 만든다. 새로 만들었으면 true
+fn ensure_main(app: &AppHandle) -> Option<(tauri::WebviewWindow, bool)> {
     if let Some(w) = app.get_webview_window("main") {
+        return Some((w, false));
+    }
+    let cfg = app.config().app.windows.iter().find(|w| w.label == "main").cloned()?;
+    let w = tauri::WebviewWindowBuilder::from_config(app, &cfg).ok()?.build().ok()?;
+    Some((w, true))
+}
+
+fn show_main_window(app: &AppHandle, file: Option<String>) {
+    if let Some((w, created)) = ensure_main(app) {
+        if let Some(p) = file {
+            if created {
+                // 새 창은 아직 화면이 준비 전이라, 켜질 때 가져가도록 맡겨 둔다
+                if let Ok(mut g) = app.state::<LaunchPath>().0.lock() {
+                    *g = Some(p);
+                }
+            } else {
+                let _ = app.emit_to("main", "open-file", p);
+            }
+        }
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
+}
+
+#[tauri::command]
+async fn show_main(app: AppHandle) {
+    show_main_window(&app, None);
 }
 
 #[tauri::command]
@@ -445,17 +469,16 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // 이미 실행 중일 때 다른 이미지를 더블클릭하면 같은 창에서 연다
-            if let Some(p) = file_arg(args) {
-                if is_board_file(&p) {
-                    let _ = create_board(app, vec![], Some(p));
+            let file = file_arg(args);
+            if let Some(p) = &file {
+                if is_board_file(p) {
+                    let _ = create_board(app, vec![], Some(p.clone()));
                     return;
                 }
-                let _ = app.emit("open-file", p);
             }
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.set_focus();
-            }
+            // 이미지 더블클릭 또는 시작 메뉴 아이콘: 뷰어를 보이게 (닫혀 있으면 다시 만듦)
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move { show_main_window(&app, file) });
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -473,14 +496,25 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            // 보드가 열려 있을 때 뷰어를 닫으면 숨기기만 (나중에 다시 불러올 수 있게)
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "main" && window.app_handle().get_webview_window("board").is_some() {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    return;
+                }
+            }
             // 메인 창이 숨겨진 상태에서 보드를 닫으면 프로그램 종료
             if let tauri::WindowEvent::Destroyed = event {
                 if window.label() == "board" {
                     let app = window.app_handle();
-                    if let Some(m) = app.get_webview_window("main") {
-                        if !m.is_visible().unwrap_or(true) {
-                            app.exit(0);
+                    match app.get_webview_window("main") {
+                        Some(m) => {
+                            if !m.is_visible().unwrap_or(true) {
+                                app.exit(0);
+                            }
                         }
+                        None => app.exit(0),
                     }
                 }
             }

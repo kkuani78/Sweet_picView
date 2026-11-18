@@ -550,8 +550,7 @@ document.addEventListener('keydown', (e) => {
 // ---------------- 뷰어 (1장 / 2장 / 4장, 정보 패널, 선택만 보기) ----------------
 const V = {
   list: [], idx: 0, n: 1, active: 0,
-  z: 1, tx: 0, ty: 0, fit: true,
-  show: null, idleT: null, selOnly: false,
+  show: null, wheelAcc: 0, wheelT: 0, idleT: null, selOnly: false,
   info: store.get('vInfo', false),
   panes: []
 };
@@ -609,7 +608,7 @@ function buildPanes() {
     pane.dataset.k = k;
     pane.innerHTML = '<img alt="" draggable="false"><div class="plabel"></div>';
     st.appendChild(pane);
-    V.panes.push({ el: pane, img: pane.querySelector('img'), item: null, nw: 0, nh: 0, fit: 1 });
+    V.panes.push({ el: pane, img: pane.querySelector('img'), item: null, nw: 0, nh: 0, fit: 1, z: 1, tx: 0, ty: 0, isFit: true, wantActual: false });
   }
   document.querySelectorAll('#vBar .lay').forEach((b) => b.classList.toggle('on', b.dataset.act === 'lay' + V.n));
 }
@@ -622,7 +621,6 @@ function showPage(i) {
   else if (i < 0) i = Math.max(0, len - V.n);
   V.idx = i;
   if (V.active >= V.n || V.idx + V.active >= len) V.active = 0;
-  V.z = 1; V.tx = 0; V.ty = 0; V.fit = true; V.wantActual = false;
   V.panes.forEach((p, k) => loadPane(p, V.list[i + k] || null));
   markActive();
   updateViewerTexts();
@@ -636,6 +634,7 @@ function showPage(i) {
 function loadPane(p, item) {
   p.item = item;
   p.nw = 0; p.nh = 0;
+  p.z = 1; p.tx = 0; p.ty = 0; p.isFit = true; p.wantActual = false;
   const old = p.el.querySelector('.pempty');
   if (old) old.remove();
   if (!item) {
@@ -654,7 +653,7 @@ function loadPane(p, item) {
     item.w = p.nw; item.h = p.nh;
     p.img.style.width = p.nw + 'px'; p.img.style.height = p.nh + 'px';
     fitPane(p);
-    if (V.wantActual && p === V.panes[V.active]) actualSize(); else applyTransform();
+    if (p.wantActual) actualSize(p); else applyTransform();
     p.img.style.opacity = '1';
     if (V.info) renderInfo();
   };
@@ -684,9 +683,10 @@ function fitPane(p) {
   p.fit = Math.min(1, p.el.clientWidth / rw, p.el.clientHeight / rh);
 }
 
-function fitView() {
-  V.panes.forEach(fitPane);
-  V.z = 1; V.tx = 0; V.ty = 0; V.fit = true;
+// 확대/이동은 칸마다 따로 (다중 보기에서 하나만 확대 가능)
+function fitView(p) {
+  const list = p ? [p] : V.panes;
+  for (const q of list) { fitPane(q); q.z = 1; q.tx = 0; q.ty = 0; q.isFit = true; q.wantActual = false; }
   applyTransform();
 }
 
@@ -694,34 +694,38 @@ function applyTransform() {
   for (const p of V.panes) {
     if (!p.item) continue;
     const r = rotOfItem(p.item);
-    p.img.style.transform = `translate(-50%, -50%) translate(${V.tx}px, ${V.ty}px) scale(${p.fit * V.z}) rotate(${r}deg)`;
+    p.img.style.transform = `translate(-50%, -50%) translate(${p.tx}px, ${p.ty}px) scale(${p.fit * p.z}) rotate(${r}deg)`;
   }
   const ap = V.panes[V.active];
-  $('#vZoom').textContent = ap && ap.item ? Math.round(ap.fit * V.z * 100) + '%' : '';
+  $('#vZoom').textContent = ap && ap.item ? Math.round(ap.fit * ap.z * 100) + '%' : '';
 }
 
 function paneAt(x, y) {
   return V.panes.find((p) => { const r = p.el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; });
 }
 
-function zoomAt(factor, cx, cy) {
-  const p = (cx != null ? paneAt(cx, cy) : null) || V.panes[V.active];
+function activePane() { return V.panes[V.active]; }
+
+// factor 배율로 확대/축소. 기준점(cx, cy)이 없으면 칸 가운데
+function zoomAt(factor, cx, cy, pane) {
+  const p = pane || activePane();
+  if (!p || !p.item) return;
   const r = p.el.getBoundingClientRect();
   const mx = (cx ?? r.left + r.width / 2) - (r.left + r.width / 2);
   const my = (cy ?? r.top + r.height / 2) - (r.top + r.height / 2);
-  const nz = Math.max(0.05, Math.min(64, V.z * factor));
-  V.tx = mx - (mx - V.tx) * (nz / V.z);
-  V.ty = my - (my - V.ty) * (nz / V.z);
-  V.z = nz; V.fit = false;
+  const nz = Math.max(0.05, Math.min(64, p.z * factor));
+  p.tx = mx - (mx - p.tx) * (nz / p.z);
+  p.ty = my - (my - p.ty) * (nz / p.z);
+  p.z = nz; p.isFit = false;
   applyTransform();
 }
 
-function actualSize() {
-  const p = V.panes[V.active];
+function actualSize(pane) {
+  const p = pane || activePane();
   if (!p) return;
-  if (!p.nw) { V.wantActual = true; return; } // 아직 읽는 중이면 다 읽은 뒤 적용
-  V.wantActual = false;
-  V.z = 1 / p.fit; V.tx = 0; V.ty = 0; V.fit = false;
+  if (!p.nw) { p.wantActual = true; return; } // 아직 읽는 중이면 다 읽은 뒤 적용
+  p.wantActual = false;
+  p.z = 1 / p.fit; p.tx = 0; p.ty = 0; p.isFit = false;
   applyTransform();
 }
 
@@ -823,7 +827,7 @@ function toggleInfo() {
   $('#viewer').classList.toggle('info', V.info);
   renderInfo();
   $('#vInfoBtn').classList.toggle('on', V.info);
-  requestAnimationFrame(() => { V.panes.forEach(fitPane); applyTransform(); });
+  requestAnimationFrame(() => { V.panes.forEach((p) => { if (p.isFit) fitView(p); else fitPane(p); }); applyTransform(); });
 }
 
 function viewerAction(act) {
@@ -836,10 +840,10 @@ function viewerAction(act) {
     case 'selOnly': toggleSelOnly(); break;
     case 'zoomIn': zoomAt(1.25); break;
     case 'zoomOut': zoomAt(0.8); break;
-    case 'fit': fitView(); break;
+    case 'fit': fitView(V.n > 1 ? activePane() : null); break;
     case 'actual': actualSize(); break;
-    case 'rotL': rotateItem(activeItem(), -90); fitView(); if (V.info) renderInfo(); break;
-    case 'rotR': rotateItem(activeItem(), 90); fitView(); if (V.info) renderInfo(); break;
+    case 'rotL': rotateItem(activeItem(), -90); fitView(activePane()); if (V.info) renderInfo(); break;
+    case 'rotR': rotateItem(activeItem(), 90); fitView(activePane()); if (V.info) renderInfo(); break;
     case 'select': {
       const it = activeItem();
       if (!it) break;
@@ -903,14 +907,27 @@ function viewerKey(e) {
 
 $('#vBar').addEventListener('click', (e) => { const b = e.target.closest('.vbtn'); if (b) viewerAction(b.dataset.act); });
 const vStage = $('#vStage');
-vStage.addEventListener('wheel', (e) => {
+$('#viewer').addEventListener('wheel', (e) => {
   e.preventDefault();
-  zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY);
+  if (e.target.closest('#vInfoPanel')) { $('#vInfoPanel').scrollTop += e.deltaY; return; }
+  if (e.ctrlKey) { const p = paneAt(e.clientX, e.clientY); zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX, e.clientY, p); return; }
+  // 휠 한 칸 = 한 장. 터치패드처럼 잘게 오는 입력은 모아서 처리
+  const now = performance.now();
+  if (now - V.wheelT > 250) V.wheelAcc = 0;
+  V.wheelT = now;
+  V.wheelAcc += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+  if (Math.abs(V.wheelAcc) >= 60) {
+    viewerAction(V.wheelAcc > 0 ? 'next' : 'prev');
+    V.wheelAcc = 0;
+  }
+  pokeIdle();
 }, { passive: false });
 let pan = null;
 vStage.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
-  pan = { x: e.clientX, y: e.clientY, tx: V.tx, ty: V.ty, moved: false };
+  const p = paneAt(e.clientX, e.clientY);
+  if (!p || !p.item) return;
+  pan = { x: e.clientX, y: e.clientY, pane: p, tx: p.tx, ty: p.ty, moved: false };
   vStage.classList.add('drag');
 });
 window.addEventListener('mousemove', (e) => {
@@ -920,7 +937,7 @@ window.addEventListener('mousemove', (e) => {
   const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
   if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true;
   if (!pan.moved) return;
-  V.tx = pan.tx + dx; V.ty = pan.ty + dy; V.fit = false;
+  pan.pane.tx = pan.tx + dx; pan.pane.ty = pan.ty + dy; pan.pane.isFit = false;
   applyTransform();
 });
 window.addEventListener('mouseup', (e) => {
@@ -937,14 +954,22 @@ vStage.addEventListener('dblclick', (e) => {
     if (p && p.item) { const i = V.list.indexOf(p.item); V.n = 1; buildPanes(); V.active = 0; showPage(i); }
     return;
   }
-  V.fit ? actualSize() : fitView();
+  const p = activePane();
+  if (p) p.isFit ? actualSize(p) : fitView(p);
 });
-window.addEventListener('resize', () => { if (viewerOpen() && V.fit) fitView(); });
+window.addEventListener('resize', () => {
+  if (!viewerOpen()) return;
+  for (const p of V.panes) { if (p.isFit) fitView(p); else { fitPane(p); } }
+  applyTransform();
+});
 function pokeIdle() {
   $('#viewer').classList.remove('idle');
   clearTimeout(V.idleT);
-  V.idleT = setTimeout(() => { if (!V.info) $('#viewer').classList.add('idle'); }, 2500);
+  // 2.5초 동안 움직임이 없으면 메뉴 숨김 (메뉴 위에 마우스가 있거나 정보 패널이 열려 있으면 숨기지 않음)
+  V.idleT = setTimeout(() => { if (!V.info && !V.hoverBar) $('#viewer').classList.add('idle'); }, 2500);
 }
+$('#vBar').addEventListener('mouseenter', () => { V.hoverBar = true; clearTimeout(V.idleT); $('#viewer').classList.remove('idle'); });
+$('#vBar').addEventListener('mouseleave', () => { V.hoverBar = false; pokeIdle(); });
 
 // ---------------- 레이아웃 계산 (PPT/인쇄 공용) ----------------
 // 한 장에 n개를 넣을 때, 이미지가 가장 크게 보이는 가로×세로 칸 수를 찾는다.
@@ -1371,9 +1396,17 @@ async function openFile(p) {
     const i = state.view.findIndex((x) => x.path === p);
     if (i >= 0) {
       V.list = state.view; V.selOnly = false;
-      V.idx = i; V.panes[0].item = state.view[i];
-      Object.assign(state.view[i], { w: tmp.w, h: tmp.h });
-      updateViewerTexts();
+      const p0 = V.panes[0];
+      if (V.n === 1 && p0 && p0.item === tmp && p0.nw) {
+        // 이미 보이고 있으면 그대로 두고 목록만 바꾼다
+        V.idx = i; p0.item = state.view[i];
+        Object.assign(state.view[i], { w: tmp.w, h: tmp.h });
+        updatePaneCheck(p0);
+        updateViewerTexts();
+      } else {
+        // 아직 읽는 중이었으면 새 목록 기준으로 다시 띄운다
+        showPage(i);
+      }
     }
   }
 }

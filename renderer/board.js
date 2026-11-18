@@ -676,9 +676,12 @@ async function toggleOnTop() {
   $('#bPin').classList.toggle('on', B.onTop);
   toast(B.onTop ? '항상 위: 켬' : '항상 위: 끔');
 }
+// 창 전체 투명도 (Windows 기능). 화면 쪽 투명 처리는 쓰지 않는다 (잔상 문제)
+let opT = 0;
 function setOpacity(v) {
-  B.opacity = Math.max(0.15, Math.min(1, v));
-  root.style.opacity = B.opacity;
+  B.opacity = Math.round(Math.max(0.15, Math.min(1, v)) * 100) / 100;
+  clearTimeout(opT);
+  opT = setTimeout(() => inv('set_window_opacity', { opacity: B.opacity }).catch(() => toast('이 환경에서는 투명도를 바꿀 수 없습니다')), 30);
   toast(`투명도 ${Math.round(B.opacity * 100)}%`, 900);
 }
 

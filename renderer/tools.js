@@ -409,3 +409,154 @@ $('#stVer').onclick = () => checkUpdate(true);
   try { $('#stVer').textContent = 'v' + (await api.appVersion()); } catch {}
   setTimeout(() => checkUpdate(false), 3000); // 켜고 3초 뒤 조용히 확인
 })();
+
+// ======================= 보드로 보내기 =======================
+function sendToBoard() {
+  const items = selectedItems();
+  api.openBoard(items.map((x) => x.path)).catch((err) => toast('보드를 열 수 없습니다: ' + esc(String(err)), { error: true }));
+  if (items.length) toast(`보드로 ${items.length}장 보냈어요`, { ms: 2000 });
+}
+$('#btnBoard').onclick = sendToBoard;
+
+// ======================= 이동 / 복사 =======================
+function openTransfer() {
+  const items = selectedItems();
+  if (!items.length) { toast('먼저 이동하거나 복사할 파일을 선택하세요.', { error: true }); return; }
+  tool.items = items;
+  const o = store.get('transferOpt', {});
+  const recent = store.get('recentDest', []);
+  tool.dest = o.dest || '';
+  openTool('transfer', '📁 이동 / 복사', '실행', `
+    <div class="target">대상: <b>${items.length.toLocaleString()}개</b> 파일</div>
+    <div class="trow"><span class="tl">작업</span>
+      <label class="radio"><input type="radio" name="tfMode" value="copy" ${o.mode !== 'move' ? 'checked' : ''}> 복사 (원본 남김)</label>
+      <label class="radio"><input type="radio" name="tfMode" value="move" ${o.mode === 'move' ? 'checked' : ''}> 이동</label>
+    </div>
+    <div class="trow"><span class="tl">보낼 곳</span>
+      <label class="radio"><input type="radio" name="tfWhere" value="exist" ${o.where !== 'new' ? 'checked' : ''}> 기존 폴더</label>
+      <button class="btn" id="tfPick">폴더 선택…</button>
+      <span class="destpath" id="tfDest"></span>
+    </div>
+    <div class="trow"><span class="tl"></span>
+      <label class="radio"><input type="radio" name="tfWhere" value="new" ${o.where === 'new' ? 'checked' : ''}> 새 폴더 만들기</label>
+      <input class="tin wide" id="tfNew" placeholder="새 폴더 이름" value="${esc(o.newName || '')}">
+      <span class="pnote">위치:</span>
+      <select id="tfNewBase" class="sel">
+        <option value="here">지금 폴더 안</option>
+        <option value="dest">선택한 폴더 안</option>
+      </select>
+    </div>
+    ${recent.length ? `<div class="trow"><span class="tl">최근 폴더</span><div class="recent">${recent.map((r, i) => `<span class="chip2" data-i="${i}" title="${esc(r)}">${esc(r)}</span>`).join('')}</div></div>` : ''}
+    <div class="trow"><span class="tl">같은 이름이 있으면</span>
+      <select id="tfConflict" class="sel">
+        <option value="rename">번호 붙이기 (사진 (2).jpg)</option>
+        <option value="skip">건너뛰기</option>
+        <option value="overwrite">덮어쓰기</option>
+      </select>
+    </div>
+    <div class="pnote" id="tfFinal"></div>
+  `);
+  $('#tfConflict').value = o.conflict || 'rename';
+  $('#tfNewBase').value = o.newBase || 'here';
+  $('#tfPick').onclick = async () => {
+    const f = await api.pickFolderFor(tool.dest || state.folder);
+    if (f) { tool.dest = f; if ($('#tfNewBase').value !== 'dest') document.querySelector('input[name=tfWhere][value=exist]').checked = true; syncTransfer(); }
+  };
+  $('#toolBody').querySelectorAll('.chip2').forEach((c) => c.onclick = () => {
+    tool.dest = recent[+c.dataset.i];
+    document.querySelector('input[name=tfWhere][value=exist]').checked = true;
+    syncTransfer();
+  });
+  $('#tfNew').addEventListener('focus', () => { document.querySelector('input[name=tfWhere][value=new]').checked = true; syncTransfer(); });
+  $('#toolBody').querySelectorAll('input,select').forEach((el) => { el.addEventListener('input', syncTransfer); el.addEventListener('change', syncTransfer); });
+  syncTransfer();
+}
+
+function joinPath(dir, name) {
+  const sep = dir.includes('\\') ? '\\' : '/';
+  return dir.replace(/[\\/]+$/, '') + sep + name;
+}
+
+function readTransfer() {
+  const where = document.querySelector('input[name=tfWhere]:checked').value;
+  const newName = $('#tfNew').value.trim();
+  const newBase = $('#tfNewBase').value;
+  let dest = tool.dest;
+  if (where === 'new') {
+    const base = newBase === 'dest' && tool.dest ? tool.dest : state.folder;
+    dest = newName ? joinPath(base, newName) : '';
+  }
+  return {
+    mode: document.querySelector('input[name=tfMode]:checked').value,
+    where, newName, newBase, dest,
+    conflict: $('#tfConflict').value
+  };
+}
+
+function syncTransfer() {
+  const o = readTransfer();
+  store.set('transferOpt', { mode: o.mode, where: o.where, newName: o.newName, newBase: o.newBase, conflict: o.conflict, dest: tool.dest });
+  $('#tfDest').textContent = tool.dest || '(선택 안 됨)';
+  let err = '';
+  if (o.where === 'new' && !o.newName) err = '새 폴더 이름을 입력하세요.';
+  else if (o.where === 'new' && /[\\/:*?"<>|]/.test(o.newName)) err = '폴더 이름에 쓸 수 없는 문자가 있어요: \\ / : * ? " < > |';
+  else if (!o.dest) err = '보낼 폴더를 선택하세요.';
+  $('#tfFinal').innerHTML = o.dest ? `→ <b>${esc(o.dest)}</b> 로 ${o.mode === 'move' ? '이동' : '복사'}합니다.` : '';
+  toolMsg(err, !!err && o.where === 'new' && !!o.newName);
+  $('#toolOk').textContent = o.mode === 'move' ? '이동하기' : '복사하기';
+  $('#toolOk').disabled = tool.busy || !!err;
+}
+
+async function runTransfer() {
+  if (tool.busy) return;
+  const o = readTransfer();
+  if (!o.dest) return;
+  const paths = tool.items.map((x) => x.path);
+  setToolBusy(true);
+  $('#toolProgress').classList.remove('hidden');
+  const setP = (d, t) => { $('#toolBar').style.width = (d / t * 100) + '%'; $('#toolText').textContent = `${d} / ${t}`; };
+  setP(0, paths.length);
+  const un = await api.onTransferProgress(setP);
+  let res;
+  try { res = await api.transferFiles(paths, o.dest, o.mode, o.conflict); }
+  catch (err) { setToolBusy(false); toolMsg('실패: ' + err, true); try { un(); } catch {} return; }
+  try { un(); } catch {}
+  setToolBusy(false);
+  closeTool();
+  // 최근 폴더 기억 (5개)
+  const recent = [o.dest].concat(store.get('recentDest', []).filter((r) => r !== o.dest)).slice(0, 5);
+  store.set('recentDest', recent);
+  const ok = res.filter((r) => r.out), skipped = res.filter((r) => r.skipped), bad = res.filter((r) => r.error);
+  window.__lastTransfer = res;
+  const word = o.mode === 'move' ? '이동' : '복사';
+  let msg = `${word} 완료: <b>${ok.length}개</b>`;
+  if (skipped.length) msg += ` · 건너뜀 ${skipped.length}개`;
+  if (bad.length) msg += `<br><span style="color:#ff7b72">실패 ${bad.length}개</span><br><span style="font-size:12px;color:#a3a9b5">${bad.slice(0, 3).map((b) => esc(baseName(b.path) + ': ' + b.error)).join('<br>')}</span>`;
+  const actions = [{ label: '보낸 폴더 열기', run: () => openFolder(o.dest) }];
+  if (o.mode === 'move' && ok.length) actions.push({ label: '되돌리기', run: () => undoMove(ok) });
+  toast(msg, { ms: 15000, error: !ok.length && !skipped.length, actions });
+  if (o.mode === 'move' || o.dest === state.folder || dirOf(o.dest + '/x') === dirOf(state.folder + '/x')) await reloadKeepSelection(new Map());
+  refreshTreeNode();
+}
+
+// 이동 되돌리기: 원래 폴더로 다시 이동
+async function undoMove(done) {
+  const groups = new Map();
+  for (const r of done) {
+    const back = dirOf(r.path).replace(/[\\/]+$/, '');
+    if (!groups.has(back)) groups.set(back, []);
+    groups.get(back).push(r.out);
+  }
+  let n = 0;
+  try {
+    for (const [dir, list] of groups) {
+      const rr = await api.transferFiles(list, dir, 'move', 'rename');
+      n += rr.filter((x) => x.out).length;
+    }
+    toast(`${n}개를 원래 폴더로 되돌렸습니다.`);
+    await reloadKeepSelection(new Map());
+  } catch (err) { toast('되돌리기 실패: ' + esc(String(err)), { error: true }); }
+}
+
+$('#btnMove').onclick = () => openTransfer();
+$('#toolOk').onclick = () => (tool.mode === 'resize' ? runResize() : tool.mode === 'transfer' ? runTransfer() : runRename());

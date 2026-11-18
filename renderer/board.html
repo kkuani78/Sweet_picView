@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Sweet Ref</title>
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<div id="root">
+  <div id="stage">
+    <div id="world"></div>
+    <div id="rubber"></div>
+    <div id="selbox"><i class="h nw"></i><i class="h ne"></i><i class="h sw"></i><i class="h se"></i></div>
+    <div id="empty">
+      <div class="big">Sweet Ref</div>
+      <div>이미지를 끌어다 놓거나 <b>Ctrl+V</b>로 붙여넣으세요</div>
+      <div class="sub">PicView에서 <b>📌 보드로</b> · 오른쪽 클릭 메뉴 · <b>F1</b> 도움말</div>
+    </div>
+    <div id="cropHint" class="hidden">자를 영역을 끌어서 지정하세요 · Esc 취소</div>
+  </div>
+  <div id="bar" data-tauri-drag-region>
+    <span id="title" data-tauri-drag-region>Sweet Ref</span>
+    <span class="sp" data-tauri-drag-region></span>
+    <button id="bPin" title="항상 위 (T)">📌</button>
+    <button id="bMin" title="최소화">─</button>
+    <button id="bMax" title="최대화">▢</button>
+    <button id="bClose" title="닫기">✕</button>
+  </div>
+</div>
+<div id="help" class="hidden">
+  <div class="card">
+    <h3>Sweet Ref 조작법</h3>
+    <table>
+      <tr><td>이미지 추가</td><td>끌어다 놓기 · Ctrl+V · PicView에서 📌 보드로</td></tr>
+      <tr><td>화면 이동</td><td>가운데 버튼 끌기 · Space+끌기</td></tr>
+      <tr><td>확대/축소</td><td>마우스 휠</td></tr>
+      <tr><td>전체 보기 / 하나 크게</td><td>F · 빈 곳 더블클릭 / 이미지 더블클릭</td></tr>
+      <tr><td>선택</td><td>클릭 · Ctrl/Shift+클릭 · 빈 곳 끌기 · Ctrl+A</td></tr>
+      <tr><td>크기 조절</td><td>선택 상자 모서리 끌기</td></tr>
+      <tr><td>회전 / 뒤집기</td><td>R (Shift+R 반대) / H 좌우 · Shift+H 상하</td></tr>
+      <tr><td>자르기</td><td>C 또는 메뉴 → 영역 끌기 · Shift+C 원래대로</td></tr>
+      <tr><td>자동 정렬</td><td>Ctrl+P</td></tr>
+      <tr><td>회색조</td><td>G</td></tr>
+      <tr><td>항상 위 / 투명도</td><td>T / Ctrl+휠 · 메뉴</td></tr>
+      <tr><td>복사 / 삭제</td><td>Ctrl+C / Delete</td></tr>
+      <tr><td>되돌리기</td><td>Ctrl+Z · Ctrl+Y</td></tr>
+      <tr><td>저장 / 열기</td><td>Ctrl+S (Ctrl+Shift+S 다른 이름) / Ctrl+O</td></tr>
+    </table>
+    <div class="close">아무 곳이나 누르면 닫힙니다</div>
+  </div>
+</div>
+<div id="dlg" class="hidden"><div class="card"><div id="dlgMsg"></div><div class="btns" id="dlgBtns"></div></div></div>
+<div id="toast" class="hidden"></div>
+<script src="board.js"></script>
+</body>
+</html>

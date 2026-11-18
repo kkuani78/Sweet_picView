@@ -22,7 +22,7 @@ input, select { font: inherit; }
 
 /* 툴바 */
 #toolbar, #actionbar { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: var(--bg2); border-bottom: 1px solid var(--line); }
-#actionbar { justify-content: space-between; background: #1f2228; padding: 5px 10px; }
+#actionbar { flex-wrap: wrap; row-gap: 6px; justify-content: space-between; background: #1f2228; padding: 5px 10px; }
 .tb-group { display: flex; align-items: center; gap: 6px; }
 .btn { background: var(--bg3); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; cursor: pointer; white-space: nowrap; }
 .btn:hover { background: #343944; border-color: #454b57; }
@@ -210,7 +210,7 @@ input[type=range] { width: 110px; accent-color: var(--accent); }
 .ptable td.new { color: #7ee2a8; }
 .pwrap { max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
 .pnote { color: var(--fg3); font-size: 12px; }
-@media (max-width: 1560px) { #actionbar .hint { display: none; } }
+@media (max-width: 1800px) { #actionbar .hint { display: none; } }
 @media (max-width: 1250px) { .seg-lbl { display: none; } }
 
 #stVer { color: var(--fg3); cursor: pointer; white-space: nowrap; }
@@ -218,3 +218,8 @@ input[type=range] { width: 110px; accent-color: var(--accent); }
 #stPath { margin-left: auto; }
 .toast .t-prog { margin-top: 8px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
 .toast .t-prog div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+
+.recent { display: flex; flex-wrap: wrap; gap: 6px; }
+.recent .chip2 { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; cursor: pointer; font-size: 12px; color: var(--fg2); max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent .chip2:hover { border-color: var(--accent); color: var(--fg); }
+.destpath { font-size: 12px; color: var(--fg); word-break: break-all; }

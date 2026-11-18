@@ -16,6 +16,11 @@ ACDSee 스타일의 사내용 이미지 뷰어 (Windows). Tauri 기반이라 설
   - 변환 결과는 임시 폴더(`%TEMP%\sweetpicview-cache`)에 캐시, 14일 지나면 자동 삭제
 - **일괄 리사이즈**: 비율/긴 변/가로/세로/영역 맞추기, 원본 형식·JPG·PNG, 하위 폴더·다른 폴더·덮어쓰기
 - **일괄 이름 바꾸기 (F2)**: 프리픽스, 포스트픽스, 새 이름, 리넘버링(시작·증가·자릿수·위치·구분자), 확장자 대소문자, 미리보기·충돌 검사·되돌리기
+- **📁 이동·복사 (F7)**: 선택 파일을 기존 폴더 또는 새 폴더로 이동/복사, 최근 폴더, 같은 이름 처리(번호 붙이기·건너뛰기·덮어쓰기), 이동 되돌리기
+- **📌 레퍼런스 보드 Sweet Ref (B)**: PureRef 방식의 참고 이미지 보드 (별도 창)
+  - 끌어다 놓기 · Ctrl+V · PicView에서 보내기 / 휠 확대 · 가운데 버튼(또는 Space) 끌어 이동
+  - 이동·크기·회전·뒤집기·자르기, 자동 정렬(Ctrl+P), 회색조(G), 항상 위(T), 투명도(Ctrl+휠)
+  - 되돌리기, `.sref` 보드 파일 저장/열기 (이미지 포함, 더블클릭으로 바로 열림), 오른쪽 클릭 메뉴, F1 도움말
 - **PPT 내보내기**: 슬라이드 한 장당 이미지 수(1~20장 또는 가로×세로 직접 지정), 슬라이드 크기, 여백, 파일명
 - **인쇄**: 종이 한 장당 이미지 수, 용지·방향, 여백, 파일명 (인쇄 창에서 "PDF로 저장" 가능)
 
@@ -49,6 +54,7 @@ npm run dist     # 설치파일 빌드
 - `src-tauri/src/wic.rs` — Windows 이미지 코덱(HEIC 등), 탐색기 썸네일
 - `src-tauri/tauri.conf.json` — 앱 이름, 창, 설치파일, 파일 연결 설정
 - `renderer/` — 화면 (index.html, style.css, app.js, tools.js, api.js)
+- `renderer/board.*` — 레퍼런스 보드 Sweet Ref
 - `renderer/vendor/pptxgen.bundle.js` — PPT 생성 라이브러리
 - `src-tauri/installer/installer.nsi` — 설치 프로그램 템플릿 (기존 버전을 지우지 않고 덮어쓰도록 수정)
 - `build/icon.png` — 아이콘 원본 (`npx tauri icon build/icon.png -o src-tauri/icons`로 아이콘 생성)

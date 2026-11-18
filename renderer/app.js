@@ -460,6 +460,8 @@ function showContextMenu(x, y, onTile) {
     items.push([`선택한 이미지 2장씩 보기`, '', () => openViewer(state.focus, { n: 2, selOnly: true })]);
     items.push([`선택한 이미지 4장씩 보기`, '', () => openViewer(state.focus, { n: 4, selOnly: true })]);
     items.push(null);
+    items.push([`선택한 ${n}개 보드로 보내기`, 'B', () => sendToBoard()]);
+    items.push([`선택한 ${n}개 이동/복사…`, 'F7', () => openTransfer()]);
     items.push([`선택한 ${n}개 크기 바꾸기`, '', () => openResize()]);
     items.push([`선택한 ${n}개 이름 바꾸기`, 'F2', () => openRename()]);
     items.push([`선택한 ${n}개 PPT로 내보내기`, 'Ctrl+E', () => openDialog('ppt')]);
@@ -522,6 +524,8 @@ document.addEventListener('keydown', (e) => {
   if (ctrl && e.key.toLowerCase() === 'p') { e.preventDefault(); openDialog('print'); return; }
   if (e.key === 'Escape') { selectNone(); return; }
   if (e.key === 'F2') { e.preventDefault(); openRename(); return; }
+  if (e.key === 'F7') { e.preventDefault(); openTransfer(); return; }
+  if (e.key.toLowerCase() === 'b' && !ctrl) { sendToBoard(); return; }
   if (e.key === 'Backspace') { e.preventDefault(); goUp(); return; }
   if (!n) return;
   if (e.key === 'Enter') { if (state.focus >= 0) openViewer(state.focus, { n: 1 }); return; }
@@ -1385,6 +1389,7 @@ api.onDrop(async (paths) => {
 
 // 이미지 파일 하나 열기 (더블클릭 실행 / 끌어다 놓기)
 async function openFile(p) {
+  if (extOf(p) === 'sref') { api.openBoard([], p); return; }
   const name = baseName(p);
   const tmp = { name, path: p, ext: extOf(name), url: imgUrl(p), size: 0, mtime: 0 };
   openViewerWithItems([tmp], 0);

@@ -241,6 +241,64 @@ pub async fn rename_files(pairs: Vec<(String, String)>) -> Result<Vec<(String, S
 }
 
 
+// ---------------- 이동 / 복사 ----------------
+#[derive(Serialize)]
+pub struct TransferResult {
+    path: String,
+    out: Option<String>,
+    skipped: bool,
+    error: Option<String>,
+}
+
+/// mode: "copy" | "move", conflict: "rename" | "skip" | "overwrite"
+#[tauri::command]
+pub async fn transfer_files<R: tauri::Runtime>(app: tauri::AppHandle<R>, paths: Vec<String>, dest: String, mode: String, conflict: String) -> Result<Vec<TransferResult>, String> {
+    let dest = PathBuf::from(dest.trim());
+    if dest.as_os_str().is_empty() {
+        return Err("대상 폴더가 비어 있습니다".into());
+    }
+    fs::create_dir_all(&dest).map_err(|e| format!("폴더를 만들 수 없습니다: {e}"))?;
+    let total = paths.len();
+    let mut out = Vec::with_capacity(total);
+    for (i, p) in paths.iter().enumerate() {
+        let src = PathBuf::from(p);
+        let r = (|| -> Result<(Option<String>, bool), String> {
+            let name = src.file_name().ok_or("잘못된 경로")?;
+            let mut target = dest.join(name);
+            if target == src {
+                return Ok((None, true)); // 같은 폴더로 이동/복사
+            }
+            if target.exists() {
+                match conflict.as_str() {
+                    "skip" => return Ok((None, true)),
+                    "overwrite" => {
+                        if target.is_dir() {
+                            return Err("같은 이름의 폴더가 있습니다".into());
+                        }
+                    }
+                    _ => target = unique(target),
+                }
+            }
+            if mode == "move" {
+                if fs::rename(&src, &target).is_err() {
+                    // 다른 드라이브: 복사 후 원본 삭제
+                    fs::copy(&src, &target).map_err(|e| e.to_string())?;
+                    fs::remove_file(&src).map_err(|e| format!("복사는 됐지만 원본을 지우지 못했습니다: {e}"))?;
+                }
+            } else {
+                fs::copy(&src, &target).map_err(|e| e.to_string())?;
+            }
+            Ok((Some(target.to_string_lossy().to_string()), false))
+        })();
+        out.push(match r {
+            Ok((o, skipped)) => TransferResult { path: p.clone(), out: o, skipped, error: None },
+            Err(e) => TransferResult { path: p.clone(), out: None, skipped: false, error: Some(e) },
+        });
+        let _ = app.emit("transfer-progress", (i + 1, total));
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,6 +342,27 @@ mod tests {
         let rt = tauri::async_runtime::block_on(rename_files(vec![(p("a.png"), "proj_001_v2.png".into()), (p("b.png"), "proj_002_v2.png".into())])).unwrap();
         assert!(dir.join("proj_001_v2.png").exists() && !dir.join("a.png").exists());
         println!("renumber ok {:?}", rt);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn transfer() {
+        let dir = std::env::temp_dir().join(format!("spv_tr_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("dst")).unwrap();
+        for n in ["a.jpg", "b.jpg"] { fs::write(dir.join(n), n.as_bytes()).unwrap(); }
+        fs::write(dir.join("dst/a.jpg"), b"old").unwrap();
+        let app = tauri::test::mock_app();
+        let p = |n: &str| dir.join(n).to_string_lossy().to_string();
+        let run = |mode: &str, conflict: &str, dest: &str| tauri::async_runtime::block_on(transfer_files(app.handle().clone(), vec![p("a.jpg"), p("b.jpg")], p(dest), mode.into(), conflict.into())).unwrap();
+        let r = run("copy", "rename", "dst");
+        println!("copy+rename: {:?}", r.iter().map(|x| x.out.clone()).collect::<Vec<_>>());
+        assert!(dir.join("dst/a (2).jpg").exists() && dir.join("a.jpg").exists());
+        let r = run("copy", "skip", "dst");
+        assert!(r[0].skipped && r[1].skipped);
+        let r = run("move", "overwrite", "new_folder/sub");
+        println!("move to new folder: {:?}", r.iter().map(|x| x.out.clone()).collect::<Vec<_>>());
+        assert!(!dir.join("a.jpg").exists() && dir.join("new_folder/sub/a.jpg").exists());
         let _ = fs::remove_dir_all(&dir);
     }
 }

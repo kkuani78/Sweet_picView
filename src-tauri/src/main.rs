@@ -221,6 +221,26 @@ async fn save_file(app: AppHandle, request: Request<'_>) -> Result<Option<String
     }
 }
 
+/// 정해진 경로에 바로 저장 (보드 다시 저장). 임시 파일에 쓴 뒤 바꿔치기
+#[tauri::command]
+async fn save_to_path(request: Request<'_>) -> Result<Option<String>, String> {
+    let data = match request.body() {
+        InvokeBody::Raw(b) => b.clone(),
+        _ => return Err("잘못된 데이터".into()),
+    };
+    let path = header(&request, "x-path");
+    if path.is_empty() {
+        return Err("경로가 없습니다".into());
+    }
+    let tmp = PathBuf::from(format!("{path}.spvtmp"));
+    fs::write(&tmp, &data).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &path).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })?;
+    Ok(Some(path))
+}
+
 #[tauri::command]
 async fn read_file(path: String) -> Result<Response, String> {
     fs::read(&path).map(Response::new).map_err(|e| e.to_string())
@@ -287,6 +307,67 @@ async fn install_update(app: AppHandle) -> Result<(), String> {
 }
 
 struct LaunchPath(Mutex<Option<String>>);
+
+// ---------- 레퍼런스 보드 (Sweet Ref) ----------
+#[derive(Default)]
+struct BoardPending(Mutex<(Vec<String>, Option<String>)>);
+
+fn is_board_file(p: &str) -> bool {
+    p.to_ascii_lowercase().ends_with(".sref")
+}
+
+fn create_board(app: &AppHandle, paths: Vec<String>, file: Option<String>) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("board") {
+        let _ = app.emit_to("board", "board-add", serde_json::json!({ "paths": paths, "file": file }));
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    if let Ok(mut g) = app.state::<BoardPending>().0.lock() {
+        *g = (paths, file);
+    }
+    tauri::WebviewWindowBuilder::new(app, "board", tauri::WebviewUrl::App("board.html".into()))
+        .title("Sweet Ref")
+        .inner_size(960.0, 720.0)
+        .min_inner_size(240.0, 160.0)
+        .decorations(false)
+        .transparent(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// PicView에서 보드 열기 (paths: 보낼 이미지, file: 열 .sref)
+#[tauri::command]
+async fn open_board(app: AppHandle, paths: Vec<String>, file: Option<String>) -> Result<(), String> {
+    create_board(&app, paths, file)
+}
+
+#[tauri::command]
+fn board_take_pending(state: tauri::State<BoardPending>) -> (Vec<String>, Option<String>) {
+    state.0.lock().map(|mut g| std::mem::take(&mut *g)).unwrap_or_default()
+}
+
+#[tauri::command]
+fn show_main(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+#[tauri::command]
+async fn pick_open_file(app: AppHandle, filter: String, exts: Vec<String>) -> Option<String> {
+    let e: Vec<&str> = exts.iter().map(|s| s.as_str()).collect();
+    app.dialog()
+        .file()
+        .add_filter(&filter, &e)
+        .blocking_pick_file()
+        .and_then(|f| f.into_path().ok())
+        .map(|p| p.to_string_lossy().to_string())
+}
 
 fn file_arg<I: IntoIterator<Item = String>>(args: I) -> Option<String> {
     args.into_iter()
@@ -356,13 +437,19 @@ fn mime_for(ext: &str) -> &'static str {
 }
 
 fn main() {
-    let launch = file_arg(std::env::args());
+    let launch_arg = file_arg(std::env::args());
+    let board_file = launch_arg.clone().filter(|p| is_board_file(p));
+    let launch = launch_arg.filter(|p| !is_board_file(p));
     std::thread::spawn(convert::clean_cache);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             // 이미 실행 중일 때 다른 이미지를 더블클릭하면 같은 창에서 연다
             if let Some(p) = file_arg(args) {
+                if is_board_file(&p) {
+                    let _ = create_board(app, vec![], Some(p));
+                    return;
+                }
                 let _ = app.emit("open-file", p);
             }
             if let Some(w) = app.get_webview_window("main") {
@@ -374,6 +461,30 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(LaunchPath(Mutex::new(launch)))
+        .manage(BoardPending::default())
+        .setup(move |app| {
+            if let Some(f) = board_file.clone() {
+                // .sref를 더블클릭해서 켠 경우: 보드만 띄운다
+                if let Some(m) = app.get_webview_window("main") {
+                    let _ = m.hide();
+                }
+                let _ = create_board(app.handle(), vec![], Some(f));
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            // 메인 창이 숨겨진 상태에서 보드를 닫으면 프로그램 종료
+            if let tauri::WindowEvent::Destroyed = event {
+                if window.label() == "board" {
+                    let app = window.app_handle();
+                    if let Some(m) = app.get_webview_window("main") {
+                        if !m.is_visible().unwrap_or(true) {
+                            app.exit(0);
+                        }
+                    }
+                }
+            }
+        })
         // localimg://localhost/<경로>  →  실제 이미지 파일
         .register_asynchronous_uri_scheme_protocol("localimg", |_ctx, request, responder| {
             let raw = request.uri().path().trim_start_matches('/').to_string();
@@ -437,6 +548,7 @@ fn main() {
             pick_folder,
             parent_dir,
             save_file,
+            save_to_path,
             read_file,
             open_path,
             show_in_folder,
@@ -445,10 +557,15 @@ fn main() {
             exif_info,
             pick_folder_for,
             app_version,
+            open_board,
+            board_take_pending,
+            show_main,
+            pick_open_file,
             check_update,
             install_update,
             tools::resize_images,
-            tools::rename_files
+            tools::rename_files,
+            tools::transfer_files
         ])
         .run(tauri::generate_context!())
         .expect("Sweet picView 실행 오류");

@@ -11,6 +11,11 @@ ACDSee 스타일의 사내용 이미지 뷰어 (Windows). Tauri 기반이라 설
   - **정보 패널** 토글 (키 I): 해상도, 크기, 날짜, 폴더, 사진 정보(EXIF)
   - 확대·축소, 1:1(Z), 맞춤(0), 회전(R/L), 슬라이드쇼(F5), 전체 화면(F)
 - **이미지 더블클릭으로 열기**: 설치 시 이미지 형식이 연결되며, 이미 켜져 있으면 같은 창에서 열림
+- **지원 형식**: JPG · PNG · GIF · WebP · BMP · AVIF · ICO · SVG · TIFF · TGA · EXR · PSD/PSB · IFF(Maya, Amiga) · HEIC/HEIF · RAW(CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW 등)
+  - RAW는 카메라 내장 미리보기 사용, HEIC는 Windows의 "HEIF 이미지 확장"·"HEVC 비디오 확장" 필요
+  - 변환 결과는 임시 폴더(`%TEMP%\sweetpicview-cache`)에 캐시, 14일 지나면 자동 삭제
+- **일괄 리사이즈**: 비율/긴 변/가로/세로/영역 맞추기, 원본 형식·JPG·PNG, 하위 폴더·다른 폴더·덮어쓰기
+- **일괄 이름 바꾸기 (F2)**: 프리픽스, 포스트픽스, 새 이름, 리넘버링(시작·증가·자릿수·위치·구분자), 확장자 대소문자, 미리보기·충돌 검사·되돌리기
 - **PPT 내보내기**: 슬라이드 한 장당 이미지 수(1~20장 또는 가로×세로 직접 지정), 슬라이드 크기, 여백, 파일명
 - **인쇄**: 종이 한 장당 이미지 수, 용지·방향, 여백, 파일명 (인쇄 창에서 "PDF로 저장" 가능)
 
@@ -29,7 +34,10 @@ npm run dist     # 설치파일 빌드
 
 ## 파일 구성
 - `src-tauri/src/main.rs` — 백엔드: 폴더 목록, 파일 읽기/저장, 이미지 전달, 파일 연결, EXIF
+- `src-tauri/src/convert.rs` — 특수 형식 변환 (TIFF·TGA·EXR·PSD·IFF·RAW·HEIC) + 캐시
+- `src-tauri/src/tools.rs` — 일괄 리사이즈, 일괄 이름 바꾸기
+- `src-tauri/src/wic.rs` — Windows 이미지 코덱(HEIC 등)
 - `src-tauri/tauri.conf.json` — 앱 이름, 창, 설치파일, 파일 연결 설정
-- `renderer/` — 화면 (index.html, style.css, app.js, api.js)
+- `renderer/` — 화면 (index.html, style.css, app.js, tools.js, api.js)
 - `renderer/vendor/pptxgen.bundle.js` — PPT 생성 라이브러리
 - `build/icon.png` — 아이콘 원본 (`npx tauri icon build/icon.png -o src-tauri/icons`로 아이콘 생성)

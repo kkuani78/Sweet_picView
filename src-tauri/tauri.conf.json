@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Sweet picView",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "identifier": "com.sweetpicview.app",
   "build": {
     "frontendDist": "../renderer"
@@ -53,6 +53,42 @@
         ],
         "name": "SweetPicView.Image",
         "description": "이미지 (Sweet picView)",
+        "role": "Viewer"
+      },
+      {
+        "ext": [
+          "tif",
+          "tiff",
+          "tga",
+          "exr",
+          "psd",
+          "psb",
+          "iff",
+          "heic",
+          "heif"
+        ],
+        "name": "SweetPicView.Pro",
+        "description": "이미지 (Sweet picView)",
+        "role": "Viewer"
+      },
+      {
+        "ext": [
+          "cr2",
+          "cr3",
+          "nef",
+          "nrw",
+          "arw",
+          "srf",
+          "sr2",
+          "dng",
+          "raf",
+          "orf",
+          "rw2",
+          "pef",
+          "srw"
+        ],
+        "name": "SweetPicView.Raw",
+        "description": "RAW 사진 (Sweet picView)",
         "role": "Viewer"
       }
     ],

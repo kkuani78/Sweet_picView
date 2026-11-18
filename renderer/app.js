@@ -27,6 +27,7 @@ const store = {
 };
 
 const imgUrl = (p) => api.imgUrl(p);
+const HEIC_EXT = ['heic', 'heif'];
 const extOf = (n) => { const i = n.lastIndexOf('.'); return i < 0 ? '' : n.slice(i + 1).toLowerCase(); };
 const fmtSize = (b) => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : b < 1073741824 ? (b / 1048576).toFixed(1) + ' MB' : (b / 1073741824).toFixed(2) + ' GB';
 const fmtDate = (ms) => { if (!ms) return ''; const d = new Date(ms); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
@@ -119,7 +120,7 @@ async function openFolder(p, focusPath, opts = {}) {
   }
   if (token !== state.loadToken) return;
   state.folder = p;
-  state.all = images.map((it) => ({ ...it, ext: extOf(it.name), url: imgUrl(it.path) }));
+  state.all = images.map((it) => ({ ...it, ext: extOf(it.name), url: imgUrl(it.path) + '?v=' + Math.round(it.mtime || 0) }));
   state.selected.clear();
   state.focus = -1; state.anchor = -1;
   store.set('lastFolder', p);
@@ -198,7 +199,7 @@ function pumpThumbs() {
     }).catch(() => {
       item.broken = true;
       const th = tile.querySelector('.thumb');
-      th.innerHTML = '<span class="ph">미리보기 불가</span>';
+      th.innerHTML = `<span class="ph">${HEIC_EXT.includes(item.ext) ? 'HEIF 확장 필요' : '미리보기 불가'}</span>`;
     }).finally(() => { thumbActive--; pumpThumbs(); });
   }
 }
@@ -447,6 +448,8 @@ function showContextMenu(x, y, onTile) {
     items.push([`선택한 이미지 2장씩 보기`, '', () => openViewer(state.focus, { n: 2, selOnly: true })]);
     items.push([`선택한 이미지 4장씩 보기`, '', () => openViewer(state.focus, { n: 4, selOnly: true })]);
     items.push(null);
+    items.push([`선택한 ${n}개 크기 바꾸기`, '', () => openResize()]);
+    items.push([`선택한 ${n}개 이름 바꾸기`, 'F2', () => openRename()]);
     items.push([`선택한 ${n}개 PPT로 내보내기`, 'Ctrl+E', () => openDialog('ppt')]);
     items.push([`선택한 ${n}개 인쇄`, 'Ctrl+P', () => openDialog('print')]);
   }
@@ -485,6 +488,9 @@ function gridCols() {
 }
 
 document.addEventListener('keydown', (e) => {
+  const kk = e.key.toLowerCase();
+  if ((e.ctrlKey && ['r', 'u', 'j', 'g', 'h', 's', 'n', 'w'].includes(kk)) || e.key === 'F7' || (e.key === 'F5' && !viewerOpen())) e.preventDefault();
+  if (!$('#toolModal').classList.contains('hidden')) return;
   if (viewerOpen()) return viewerKey(e);
   if (!$('#modal').classList.contains('hidden')) {
     if (e.key === 'Escape') closeDialog();
@@ -503,6 +509,7 @@ document.addEventListener('keydown', (e) => {
   if (ctrl && e.key.toLowerCase() === 'e') { e.preventDefault(); openDialog('ppt'); return; }
   if (ctrl && e.key.toLowerCase() === 'p') { e.preventDefault(); openDialog('print'); return; }
   if (e.key === 'Escape') { selectNone(); return; }
+  if (e.key === 'F2') { e.preventDefault(); openRename(); return; }
   if (e.key === 'Backspace') { e.preventDefault(); goUp(); return; }
   if (!n) return;
   if (e.key === 'Enter') { if (state.focus >= 0) openViewer(state.focus, { n: 1 }); return; }
@@ -639,7 +646,13 @@ function loadPane(p, item) {
     p.img.style.opacity = '1';
     if (V.info) renderInfo();
   };
-  p.img.onerror = () => { if (p.item === item) p.el.insertAdjacentHTML('beforeend', '<div class="pempty">표시할 수 없는 이미지</div>'); };
+  p.img.onerror = () => {
+    if (p.item !== item) return;
+    const msg = HEIC_EXT.includes(item.ext)
+      ? 'HEIC 사진을 보려면 Microsoft Store에서<br>“HEIF 이미지 확장”과 “HEVC 비디오 확장”을 설치하세요.'
+      : '표시할 수 없는 이미지';
+    p.el.insertAdjacentHTML('beforeend', `<div class="pempty" style="text-align:center;line-height:1.7">${msg}</div>`);
+  };
   p.img.src = item.url;
 }
 
@@ -991,7 +1004,7 @@ async function prepareImage(item, { maxSide = 0, forPpt = false } = {}) {
   c.width = Math.round(outW * s); c.height = Math.round(outH * s);
   const ctx = c.getContext('2d');
   ctx.imageSmoothingQuality = 'high';
-  const alpha = ['png', 'gif', 'webp', 'svg', 'ico', 'avif'].includes(item.ext);
+  const alpha = ['png', 'gif', 'webp', 'svg', 'ico', 'avif', 'tga', 'tif', 'tiff', 'exr', 'psd', 'psb', 'iff'].includes(item.ext);
   if (!alpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
   ctx.translate(c.width / 2, c.height / 2);
   ctx.rotate(r * Math.PI / 180);

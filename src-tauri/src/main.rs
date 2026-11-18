@@ -1,6 +1,11 @@
 // Sweet picView - 백엔드 (파일 읽기, 폴더 목록, 저장, 파일 연결)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod convert;
+mod tools;
+#[cfg(windows)]
+mod wic;
+
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,13 +15,14 @@ use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
-const IMAGE_EXT: &[&str] = &["jpg", "jpeg", "jfif", "png", "gif", "webp", "bmp", "svg", "avif", "ico"];
+const NATIVE_EXT: &[&str] = &["jpg", "jpeg", "jfif", "png", "gif", "webp", "bmp", "svg", "avif", "ico"];
 
 fn ext_of(p: &Path) -> String {
     p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase()
 }
 fn is_image(p: &Path) -> bool {
-    IMAGE_EXT.contains(&ext_of(p).as_str())
+    let e = ext_of(p);
+    NATIVE_EXT.contains(&e.as_str()) || convert::needs_decode(&e)
 }
 fn skip_name(name: &str) -> bool {
     name.starts_with('.') || name.starts_with('$')
@@ -171,6 +177,13 @@ async fn pick_folder(app: AppHandle) -> Option<String> {
 }
 
 #[tauri::command]
+async fn pick_folder_for(app: AppHandle, start: Option<String>) -> Option<String> {
+    let mut d = app.dialog().file();
+    if let Some(s) = start { d = d.set_directory(s); }
+    d.blocking_pick_folder().and_then(|f| f.into_path().ok()).map(|p| p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn parent_dir(p: String) -> Option<String> {
     Path::new(&p).parent().map(|x| x.to_string_lossy().to_string()).filter(|s| !s.is_empty() && *s != p)
 }
@@ -298,6 +311,7 @@ fn mime_for(ext: &str) -> &'static str {
 
 fn main() {
     let launch = file_arg(std::env::args());
+    std::thread::spawn(convert::clean_cache);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
@@ -319,17 +333,25 @@ fn main() {
             std::thread::spawn(move || {
                 let p = percent_encoding::percent_decode_str(&raw).decode_utf8_lossy().to_string();
                 let path = PathBuf::from(&p);
-                let resp = match fs::read(&path) {
-                    Ok(bytes) => tauri::http::Response::builder()
+                let ext = ext_of(&path);
+                let result = if convert::needs_decode(&ext) {
+                    convert::get(&path, &ext)
+                } else {
+                    fs::read(&path).map(|b| (b, mime_for(&ext))).map_err(|e| e.to_string())
+                };
+                let resp = match result {
+                    Ok((bytes, mime)) => tauri::http::Response::builder()
                         .status(200)
-                        .header("Content-Type", mime_for(&ext_of(&path)))
+                        .header("Content-Type", mime)
                         .header("Access-Control-Allow-Origin", "*")
                         .header("Cache-Control", "max-age=3600")
                         .body(bytes)
                         .unwrap(),
-                    Err(_) => tauri::http::Response::builder()
-                        .status(404)
+                    Err(err) => tauri::http::Response::builder()
+                        .status(415)
                         .header("Access-Control-Allow-Origin", "*")
+                        .header("Access-Control-Expose-Headers", "X-Error")
+                        .header("X-Error", percent_encoding::utf8_percent_encode(&err, percent_encoding::NON_ALPHANUMERIC).to_string())
                         .body(Vec::new())
                         .unwrap(),
                 };
@@ -348,7 +370,10 @@ fn main() {
             show_in_folder,
             open_default_apps,
             get_launch_path,
-            exif_info
+            exif_info,
+            pick_folder_for,
+            tools::resize_images,
+            tools::rename_files
         ])
         .run(tauri::generate_context!())
         .expect("Sweet picView 실행 오류");

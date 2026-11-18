@@ -187,3 +187,28 @@ input[type=range] { width: 110px; accent-color: var(--accent); }
 .seg .seg-b:first-of-type { border-radius: 6px 0 0 6px; }
 .seg .seg-b:last-of-type { border-radius: 0 6px 6px 0; }
 #printHint { margin-left: 0; }
+
+/* 리사이즈 / 이름 바꾸기 */
+#toolModal { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 85; display: flex; align-items: center; justify-content: center; }
+.tool-dlg { width: min(860px, 94vw); }
+.tool-dlg .dlg-body { flex-direction: column; gap: 14px; }
+.trow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; color: var(--fg2); }
+.trow > .tl { width: 110px; flex: none; font-weight: 600; color: var(--fg); }
+.tin { background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 6px; padding: 5px 8px; width: 90px; user-select: text; }
+.tin.wide { width: 200px; }
+.tin:disabled { opacity: .4; }
+.radio { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--fg2); }
+.warn-txt { color: #f0b54a; font-size: 12px; }
+.tool-msg { font-size: 12px; color: #f0b54a; }
+.tool-msg.err { color: #ff7b72; }
+.ptable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ptable th { text-align: left; color: var(--fg3); font-weight: 500; padding: 5px 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg2); }
+.ptable td { padding: 4px 8px; border-bottom: 1px solid #2a2e35; word-break: break-all; }
+.ptable td.arrow { color: var(--fg3); width: 20px; text-align: center; }
+.ptable tr.bad td.new { color: #ff7b72; }
+.ptable tr.same td.new { color: var(--fg3); }
+.ptable td.new { color: #7ee2a8; }
+.pwrap { max-height: 300px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+.pnote { color: var(--fg3); font-size: 12px; }
+@media (max-width: 1560px) { #actionbar .hint { display: none; } }
+@media (max-width: 1250px) { .seg-lbl { display: none; } }

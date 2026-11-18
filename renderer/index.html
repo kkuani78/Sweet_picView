@@ -46,6 +46,8 @@
         <button class="btn seg-b" data-view="2">2장</button>
         <button class="btn seg-b" data-view="4">4장</button>
       </span>
+      <button id="btnResize" class="btn" title="선택한 이미지 크기 바꾸기">↔ 리사이즈</button>
+      <button id="btnRename" class="btn" title="선택한 파일 이름 바꾸기 (F2)">✎ 이름 바꾸기</button>
       <button id="btnPpt" class="btn primary" title="선택한 이미지를 PowerPoint로 (Ctrl+E)">📊 PPT로 내보내기</button>
       <button id="btnPrint" class="btn primary" title="선택한 이미지 인쇄 (Ctrl+P)">🖨 인쇄</button>
     </div>
@@ -194,11 +196,27 @@
   </div>
 </div>
 
+<!-- 리사이즈 / 이름 바꾸기 대화상자 -->
+<div id="toolModal" class="hidden">
+  <div class="dlg tool-dlg">
+    <div class="dlg-head"><span id="toolTitle"></span><button class="x" id="toolClose">✕</button></div>
+    <div class="dlg-body" id="toolBody"></div>
+    <div class="dlg-foot">
+      <div id="toolProgress" class="progress hidden"><div class="bar"><div id="toolBar"></div></div><span id="toolText"></span></div>
+      <span id="toolMsg" class="tool-msg"></span>
+      <div class="spacer"></div>
+      <button class="btn" id="toolCancel">취소</button>
+      <button class="btn primary" id="toolOk">확인</button>
+    </div>
+  </div>
+</div>
+
 <div id="ctxMenu" class="hidden"></div>
 <div id="toasts"></div>
 
 <script src="api.js"></script>
 <script src="vendor/pptxgen.bundle.js"></script>
 <script src="app.js"></script>
+<script src="tools.js"></script>
 </body>
 </html>

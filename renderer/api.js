@@ -17,6 +17,10 @@
     openDefaultApps: () => inv('open_default_apps'),
     getLaunchPath: () => inv('get_launch_path'),
     exif: (p) => inv('exif_info', { path: p }),
+    pickFolderFor: (start) => inv('pick_folder_for', { start: start || null }),
+    resizeImages: (paths, opts) => inv('resize_images', { paths, opts }),
+    renameFiles: (pairs) => inv('rename_files', { pairs }),
+    onResizeProgress: (cb) => T.event.listen('resize-progress', (e) => cb(e.payload[0], e.payload[1])),
     imgUrl: (p) => T.core.convertFileSrc(p, 'localimg'),
     onOpenFile: (cb) => T.event.listen('open-file', (e) => cb(e.payload)),
     onDrop: (onDrop, onHover) => {

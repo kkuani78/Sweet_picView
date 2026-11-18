@@ -1,6 +1,6 @@
 {
   "name": "picview",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "description": "PicView 이미지 뷰어",
   "scripts": {

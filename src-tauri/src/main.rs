@@ -332,7 +332,6 @@ fn create_board(app: &AppHandle, paths: Vec<String>, file: Option<String>) -> Re
         .inner_size(960.0, 720.0)
         .min_inner_size(240.0, 160.0)
         .decorations(false)
-        .transparent(true)
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -380,6 +379,36 @@ fn show_main_window(app: &AppHandle, file: Option<String>) {
 #[tauri::command]
 async fn show_main(app: AppHandle) {
     show_main_window(&app, None);
+}
+
+/// 창 전체 투명도 (Windows 창 기능 사용, 0.15~1.0)
+#[tauri::command]
+fn set_window_opacity(window: tauri::WebviewWindow, opacity: f64) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+        use windows::Win32::Foundation::{COLORREF, HWND};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE, LWA_ALPHA, WS_EX_LAYERED,
+        };
+        let handle = window.window_handle().map_err(|e| e.to_string())?;
+        let RawWindowHandle::Win32(h) = handle.as_raw() else { return Err("창을 찾을 수 없습니다".into()) };
+        let hwnd = HWND(h.hwnd.get() as *mut core::ffi::c_void);
+        let alpha = (opacity.clamp(0.15, 1.0) * 255.0).round() as u8;
+        unsafe {
+            let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+            if ex & (WS_EX_LAYERED.0 as isize) == 0 {
+                SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED.0 as isize);
+            }
+            SetLayeredWindowAttributes(hwnd, COLORREF(0), alpha, LWA_ALPHA).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (window, opacity);
+        Err("이 운영체제에서는 창 투명도를 지원하지 않습니다".into())
+    }
 }
 
 #[tauri::command]
@@ -595,6 +624,7 @@ fn main() {
             board_take_pending,
             show_main,
             pick_open_file,
+            set_window_opacity,
             check_update,
             install_update,
             tools::resize_images,

@@ -1,6 +1,6 @@
 /* Sweet Ref - 레퍼런스 보드 */
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; color: #ddd;
+html, body { margin: 0; height: 100%; overflow: hidden; background: #202124; color: #ddd;
   font-family: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; font-size: 13px; user-select: none; }
 .hidden { display: none !important; }
 #root { position: fixed; inset: 0; background: rgba(32, 33, 36, 1); border: 1px solid #3a3d44; }

@@ -4,6 +4,7 @@
   "private": true,
   "description": "PicView 이미지 뷰어",
   "scripts": {
+    "tauri": "tauri",
     "start": "tauri dev",
     "dist": "tauri build"
   },

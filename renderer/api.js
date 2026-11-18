@@ -22,6 +22,7 @@
     renameFiles: (pairs) => inv('rename_files', { pairs }),
     onResizeProgress: (cb) => T.event.listen('resize-progress', (e) => cb(e.payload[0], e.payload[1])),
     imgUrl: (p) => T.core.convertFileSrc(p, 'localimg'),
+    thumbUrl: (p) => T.core.convertFileSrc(p, 'thumb'),
     onOpenFile: (cb) => T.event.listen('open-file', (e) => cb(e.payload)),
     onDrop: (onDrop, onHover) => {
       T.event.listen('tauri://drag-drop', (e) => { onHover(false); onDrop((e.payload && e.payload.paths) || []); });

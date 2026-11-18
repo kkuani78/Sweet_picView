@@ -36,7 +36,8 @@ npm run dist     # 설치파일 빌드
 - `src-tauri/src/main.rs` — 백엔드: 폴더 목록, 파일 읽기/저장, 이미지 전달, 파일 연결, EXIF
 - `src-tauri/src/convert.rs` — 특수 형식 변환 (TIFF·TGA·EXR·PSD·IFF·RAW·HEIC) + 캐시
 - `src-tauri/src/tools.rs` — 일괄 리사이즈, 일괄 이름 바꾸기
-- `src-tauri/src/wic.rs` — Windows 이미지 코덱(HEIC 등)
+- `src-tauri/src/thumbs.rs` — 빠른 썸네일 (Windows 탐색기 썸네일 → JPEG 축소 디코드 → 일반 디코드, 디스크 캐시)
+- `src-tauri/src/wic.rs` — Windows 이미지 코덱(HEIC 등), 탐색기 썸네일
 - `src-tauri/tauri.conf.json` — 앱 이름, 창, 설치파일, 파일 연결 설정
 - `renderer/` — 화면 (index.html, style.css, app.js, tools.js, api.js)
 - `renderer/vendor/pptxgen.bundle.js` — PPT 생성 라이브러리

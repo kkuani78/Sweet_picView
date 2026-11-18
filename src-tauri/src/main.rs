@@ -3,6 +3,7 @@
 
 mod convert;
 mod tools;
+mod thumbs;
 #[cfg(windows)]
 mod wic;
 
@@ -352,6 +353,31 @@ fn main() {
                         .header("Access-Control-Allow-Origin", "*")
                         .header("Access-Control-Expose-Headers", "X-Error")
                         .header("X-Error", percent_encoding::utf8_percent_encode(&err, percent_encoding::NON_ALPHANUMERIC).to_string())
+                        .body(Vec::new())
+                        .unwrap(),
+                };
+                responder.respond(resp);
+            });
+        })
+        // thumb://localhost/<경로>  →  작은 썸네일 JPEG (X-W, X-H: 원본 크기)
+        .register_asynchronous_uri_scheme_protocol("thumb", |_ctx, request, responder| {
+            let raw = request.uri().path().trim_start_matches('/').to_string();
+            std::thread::spawn(move || {
+                let p = percent_encoding::percent_decode_str(&raw).decode_utf8_lossy().to_string();
+                let resp = match thumbs::get(Path::new(&p)) {
+                    Ok(t) => tauri::http::Response::builder()
+                        .status(200)
+                        .header("Content-Type", "image/jpeg")
+                        .header("Access-Control-Allow-Origin", "*")
+                        .header("Access-Control-Expose-Headers", "X-W, X-H")
+                        .header("X-W", t.w.to_string())
+                        .header("X-H", t.h.to_string())
+                        .header("Cache-Control", "max-age=3600")
+                        .body(t.jpeg)
+                        .unwrap(),
+                    Err(_) => tauri::http::Response::builder()
+                        .status(415)
+                        .header("Access-Control-Allow-Origin", "*")
                         .body(Vec::new())
                         .unwrap(),
                 };

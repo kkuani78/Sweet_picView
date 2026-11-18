@@ -171,6 +171,18 @@ function loadImage(url) {
 
 async function makeThumb(item) {
   if (thumbCache.has(item.path)) return thumbCache.get(item.path);
+  // 1) 프로그램이 만든 빠른 썸네일 (디스크 캐시 포함)
+  try {
+    const r = await fetch(api.thumbUrl(item.path) + '?v=' + Math.round(item.mtime || 0));
+    if (r.ok) {
+      const w = +r.headers.get('X-W') || 0, h = +r.headers.get('X-H') || 0;
+      const blob = await r.blob();
+      const t = { url: URL.createObjectURL(blob), w: w || item.w || 0, h: h || item.h || 0 };
+      thumbCache.set(item.path, t);
+      return t;
+    }
+  } catch {}
+  // 2) 안 되면 화면에서 직접 만들기 (SVG 등)
   const img = await loadImage(item.url);
   let w = img.naturalWidth || 300, h = img.naturalHeight || 300;
   const s = Math.min(1, THUMB_MAX / Math.max(w, h));
@@ -186,14 +198,14 @@ async function makeThumb(item) {
 }
 
 function pumpThumbs() {
-  while (thumbActive < 4 && thumbQueue.length) {
+  while (thumbActive < 8 && thumbQueue.length) {
     const tile = thumbQueue.pop(); // 최근에 보인 것부터
     if (!tile.isConnected) continue;
     const item = state.view[+tile.dataset.i];
     if (!item || item.path !== tile.dataset.path) continue;
     thumbActive++;
     makeThumb(item).then((t) => {
-      item.w = t.w; item.h = t.h;
+      if (t.w) { item.w = t.w; item.h = t.h; }
       fillTile(tile, item, t);
       if (state.focus >= 0 && state.view[state.focus] === item) updatePreview();
     }).catch(() => {
@@ -224,7 +236,7 @@ function fillTile(tile, item, t) {
   const r = state.rotation.get(item.path) || 0;
   if (r) img.style.transform = `rotate(${r}deg)`;
   th.appendChild(img);
-  tile.querySelector('.meta').textContent = `${t.w}×${t.h} · ${fmtSize(item.size)}`;
+  tile.querySelector('.meta').textContent = t.w ? `${t.w}×${t.h} · ${fmtSize(item.size)}` : fmtSize(item.size);
 }
 
 
@@ -1077,7 +1089,15 @@ function openDialog(mode) {
 }
 
 async function ensureDims(items) {
-  await Promise.all(items.filter((x) => !x.w).map((x) => makeThumb(x).then((t) => { x.w = t.w; x.h = t.h; }).catch(() => {})));
+  await Promise.all(items.filter((x) => !x.w).map(async (x) => {
+    try {
+      const t = await makeThumb(x);
+      if (t.w) { x.w = t.w; x.h = t.h; return; }
+      const img = await loadImage(x.url);
+      x.w = img.naturalWidth; x.h = img.naturalHeight;
+      t.w = x.w; t.h = x.h;
+    } catch {}
+  }));
 }
 
 function readOpts() {

@@ -1,3 +1,6 @@
+/* Pretendard (SIL OFL 1.1, fonts/Pretendard-LICENSE.txt) — 프로그램에 포함, 설치 불필요 */
+@font-face { font-family: "Pretendard"; font-weight: 400; src: url("fonts/Pretendard-Regular.woff2") format("woff2"); font-display: block; }
+@font-face { font-family: "Pretendard"; font-weight: 700; src: url("fonts/Pretendard-Bold.woff2") format("woff2"); font-display: block; }
 /* Sweet Ref - 레퍼런스 보드 */
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #202124; color: #ddd;
@@ -62,3 +65,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #202124; col
 .btns button { background: #33363d; border: 1px solid #454953; color: #ddd; border-radius: 6px; padding: 6px 14px; cursor: pointer; font: inherit; }
 .btns button.primary { background: #2a6fd6; border-color: #3d8bfd; color: #fff; }
 #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: rgba(20,20,22,.9); padding: 7px 14px; border-radius: 6px; font-size: 12.5px; z-index: 70; pointer-events: none; }
+
+/* 텍스트 메모 */
+.item.text { overflow: visible; }
+.item.text .tx { font-family: "Pretendard", "Malgun Gothic", sans-serif; white-space: pre; line-height: 1.35; padding: .25em .45em; border-radius: .25em; outline: none; user-select: none; display: inline-block; min-width: 1em; }
+.item.text .tx[contenteditable="true"] { user-select: text; cursor: text; box-shadow: 0 0 0 calc(1px * var(--inv, 1)) #3d8bfd; }

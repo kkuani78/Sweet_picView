@@ -20,6 +20,7 @@ ACDSee 스타일의 사내용 이미지 뷰어 (Windows). Tauri 기반이라 설
 - **📌 레퍼런스 보드 Sweet Ref (B)**: PureRef 방식의 참고 이미지 보드 (별도 창)
   - 끌어다 놓기 · Ctrl+V · PicView에서 보내기 / 휠 확대 · 가운데 버튼(또는 Space) 끌어 이동
   - 이동·크기·회전·뒤집기·자르기, 자동 정렬(Ctrl+P), 회색조(G), 항상 위(T), 투명도(Ctrl+휠)
+  - 텍스트 메모 (Ctrl+T, 더블클릭으로 고치기, 글자색·배경·굵게·크기) — Pretendard 폰트 내장 (SIL OFL, 설치 불필요)
   - 되돌리기, `.sref` 보드 파일 저장/열기 (이미지 포함, 더블클릭으로 바로 열림), 오른쪽 클릭 메뉴, F1 도움말
 - **PPT 내보내기**: 슬라이드 한 장당 이미지 수(1~20장 또는 가로×세로 직접 지정), 슬라이드 크기, 여백, 파일명
 - **인쇄**: 종이 한 장당 이미지 수, 용지·방향, 여백, 파일명 (인쇄 창에서 "PDF로 저장" 가능)
@@ -55,6 +56,7 @@ npm run dist     # 설치파일 빌드
 - `src-tauri/tauri.conf.json` — 앱 이름, 창, 설치파일, 파일 연결 설정
 - `renderer/` — 화면 (index.html, style.css, app.js, tools.js, api.js)
 - `renderer/board.*` — 레퍼런스 보드 Sweet Ref
+- `renderer/fonts/` — Pretendard 폰트 (Regular·Bold, 라이선스 `Pretendard-LICENSE.txt`)
 - `renderer/vendor/pptxgen.bundle.js` — PPT 생성 라이브러리
 - `src-tauri/installer/installer.nsi` — 설치 프로그램 템플릿 (기존 버전을 지우지 않고 덮어쓰도록 수정)
 - `build/icon.png` — 아이콘 원본 (`npx tauri icon build/icon.png -o src-tauri/icons`로 아이콘 생성)

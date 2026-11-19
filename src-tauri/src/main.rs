@@ -390,71 +390,56 @@ async fn show_main(app: AppHandle) {
     show_main_window(&app, None);
 }
 
-/// 끌기용 작은 그림 (썸네일 캐시를 128px PNG로)
+/// 끌기용 작은 그림: 썸네일 캐시를 128px로 줄여 미리 곱한 BGRA로
 #[cfg(windows)]
-fn drag_icon(path: &Path) -> Option<Vec<u8>> {
+fn drag_icon(path: &Path) -> Option<spv_dragout::DragImage> {
     let t = thumbs::get(path).ok()?;
-    let img = image::load_from_memory(&t.jpeg).ok()?.thumbnail(128, 128);
-    let mut buf = Vec::new();
-    img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png).ok()?;
-    Some(buf)
+    let img = image::load_from_memory(&t.jpeg).ok()?.thumbnail(128, 128).to_rgba8();
+    let (w, h) = img.dimensions();
+    let mut px = img.into_raw();
+    for p in px.chunks_exact_mut(4) {
+        let a = p[3] as u32;
+        let (r, g, b) = (p[0] as u32 * a / 255, p[1] as u32 * a / 255, p[2] as u32 * a / 255);
+        p[0] = b as u8;
+        p[1] = g as u8;
+        p[2] = r as u8;
+    }
+    Some((w, h, px))
 }
 
 #[derive(Serialize)]
 struct DragOut {
     dropped: bool,
     sent: usize,
-    skipped: usize, // 다른 폴더라 빠진 개수
+    skipped: usize,
 }
 
 /// 선택한 파일을 다른 프로그램(보드·크롬·탐색기 등)으로 끌어다 놓기.
-/// Windows 끌기는 한 폴더 안의 파일만 함께 보낼 수 있어서, 첫 파일(잡은 파일)과 같은 폴더의 것만 보낸다.
+/// Windows 기본 끌기를 직접 사용: 경로를 그대로 넘겨서 네트워크 드라이브·여러 폴더·수천 개도 된다.
 #[tauri::command]
 async fn start_drag_files(window: tauri::WebviewWindow, paths: Vec<String>) -> Result<DragOut, String> {
-    // 파일마다 디스크를 확인하지 않는다 (네트워크 드라이브에서 수천 장이면 느려짐) — 폴더 이름만 비교
     let files: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-    let first_dir = files.first().and_then(|p| p.parent().map(|d| d.to_path_buf())).ok_or("끌 파일이 없습니다")?;
-    let total = files.len();
-    let files: Vec<PathBuf> = files.into_iter().filter(|p| p.parent() == Some(first_dir.as_path())).collect();
-    let skipped = total - files.len();
+    if files.is_empty() {
+        return Err("끌 파일이 없습니다".into());
+    }
     let sent = files.len();
     #[cfg(windows)]
-    {
-        let icon = drag_icon(&files[0]).unwrap_or_default();
-        let (tx, rx) = std::sync::mpsc::channel::<Result<bool, String>>();
-        let w = window.clone();
-        window
-            .run_on_main_thread(move || {
-                let tx2 = tx.clone();
-                // 끌기 라이브러리 안에서 오류가 나도 프로그램이 꺼지지 않게
-                let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    drag::start_drag(
-                        &w,
-                        drag::DragItem::Files(files),
-                        drag::Image::Raw(icon),
-                        move |res, _pos| {
-                            let _ = tx2.send(Ok(matches!(res, drag::DragResult::Dropped)));
-                        },
-                        drag::Options::default(),
-                    )
-                }));
-                match r {
-                    Ok(Ok(())) => {}
-                    Ok(Err(e)) => { let _ = tx.send(Err(e.to_string())); }
-                    Err(_) => { let _ = tx.send(Err("끌기 중 오류가 났습니다".into())); }
-                }
-            })
-            .map_err(|e| e.to_string())?;
-        let dropped = tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(Ok(false)))
-            .await
-            .map_err(|e| e.to_string())??;
-        Ok(DragOut { dropped, sent, skipped })
-    }
+    let icon = drag_icon(&files[0]);
     #[cfg(not(windows))]
-    {
-        let _ = (window, sent, skipped);
-        Err("끌어서 보내기는 Windows에서만 됩니다".into())
-    }
+    let icon: Option<spv_dragout::DragImage> = None;
+    let (tx, rx) = std::sync::mpsc::channel::<Result<bool, String>>();
+    window
+        .run_on_main_thread(move || {
+            // 끌기 중 오류가 나도 프로그램이 꺼지지 않게
+            let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| spv_dragout::start(&files, icon)))
+                .unwrap_or_else(|_| Err("끌기 중 오류가 났습니다".into()));
+            let _ = tx.send(r);
+        })
+        .map_err(|e| e.to_string())?;
+    let dropped = tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(Ok(false)))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(DragOut { dropped, sent, skipped: 0 })
 }
 
 /// 창 전체 투명도 (Windows 창 기능 사용, 0.15~1.0)

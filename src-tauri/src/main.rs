@@ -411,7 +411,8 @@ struct DragOut {
 /// Windows 끌기는 한 폴더 안의 파일만 함께 보낼 수 있어서, 첫 파일(잡은 파일)과 같은 폴더의 것만 보낸다.
 #[tauri::command]
 async fn start_drag_files(window: tauri::WebviewWindow, paths: Vec<String>) -> Result<DragOut, String> {
-    let files: Vec<PathBuf> = paths.iter().map(PathBuf::from).filter(|p| p.is_file()).collect();
+    // 파일마다 디스크를 확인하지 않는다 (네트워크 드라이브에서 수천 장이면 느려짐) — 폴더 이름만 비교
+    let files: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     let first_dir = files.first().and_then(|p| p.parent().map(|d| d.to_path_buf())).ok_or("끌 파일이 없습니다")?;
     let total = files.len();
     let files: Vec<PathBuf> = files.into_iter().filter(|p| p.parent() == Some(first_dir.as_path())).collect();

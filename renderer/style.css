@@ -63,7 +63,7 @@ input[type=range] { width: 110px; accent-color: var(--accent); }
 /* 썸네일 그리드 */
 #gridWrap { flex: 1; overflow: auto; position: relative; outline: none; }
 #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--ts), 1fr)); gap: 8px; padding: 10px; align-content: start; min-height: 100%; }
-.tile { position: relative; border-radius: 8px; padding: 6px; border: 2px solid transparent; cursor: default; background: transparent; }
+.tile { position: relative; border-radius: 8px; padding: 6px; border: 2px solid transparent; cursor: default; background: transparent; -webkit-user-drag: none; }
 .tile:hover { background: #262a31; }
 .tile.focus { border-color: #4a5160; }
 .tile.sel { background: var(--selbg); border-color: var(--accent); }

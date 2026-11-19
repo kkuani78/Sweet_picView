@@ -1,6 +1,6 @@
 [package]
 name = "sweet-picview"
-version = "1.5.2"
+version = "1.6.0"
 description = "Sweet picView 이미지 뷰어"
 edition = "2021"
 
@@ -24,6 +24,7 @@ jpeg-decoder = { version = "0.3", default-features = false }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "tiff", "tga", "exr", "gif", "bmp", "webp", "ico"] }
 
 [target.'cfg(windows)'.dependencies]
+drag = "2"
 windows = { version = "0.58", features = ["Win32_Foundation", "Win32_Graphics_Imaging", "Win32_System_Com", "Win32_UI_Shell", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_Storage_FileSystem"] }
 raw-window-handle = "0.6"
 

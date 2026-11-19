@@ -390,6 +390,53 @@ async fn show_main(app: AppHandle) {
     show_main_window(&app, None);
 }
 
+/// 끌기용 작은 그림 (썸네일 캐시를 128px PNG로)
+#[cfg(windows)]
+fn drag_icon(path: &Path) -> Option<Vec<u8>> {
+    let t = thumbs::get(path).ok()?;
+    let img = image::load_from_memory(&t.jpeg).ok()?.thumbnail(128, 128);
+    let mut buf = Vec::new();
+    img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png).ok()?;
+    Some(buf)
+}
+
+/// 선택한 파일을 다른 프로그램(보드·크롬·탐색기 등)으로 끌어다 놓기. 놓았으면 true
+#[tauri::command]
+async fn start_drag_files(window: tauri::WebviewWindow, paths: Vec<String>) -> Result<bool, String> {
+    #[cfg(windows)]
+    {
+        let icon = paths.first().and_then(|p| drag_icon(Path::new(p))).unwrap_or_default();
+        let (tx, rx) = std::sync::mpsc::channel::<Result<bool, String>>();
+        let w = window.clone();
+        window
+            .run_on_main_thread(move || {
+                let files: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+                let tx2 = tx.clone();
+                let r = drag::start_drag(
+                    &w,
+                    drag::DragItem::Files(files),
+                    drag::Image::Raw(icon),
+                    move |res, _pos| {
+                        let _ = tx2.send(Ok(matches!(res, drag::DragResult::Dropped)));
+                    },
+                    drag::Options::default(),
+                );
+                if let Err(e) = r {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(Ok(false)))
+            .await
+            .map_err(|e| e.to_string())?
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (window, paths);
+        Err("끌어서 보내기는 Windows에서만 됩니다".into())
+    }
+}
+
 /// 창 전체 투명도 (Windows 창 기능 사용, 0.15~1.0)
 #[tauri::command]
 fn set_window_opacity(window: tauri::WebviewWindow, opacity: f64) -> Result<(), String> {
@@ -634,6 +681,7 @@ fn main() {
             show_main,
             pick_open_file,
             set_window_opacity,
+            start_drag_files,
             check_update,
             install_update,
             tools::resize_images,

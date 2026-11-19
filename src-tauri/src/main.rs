@@ -67,8 +67,11 @@ struct Root {
     kind: String,
 }
 
+/// 왼쪽 트리의 시작 폴더/드라이브 목록.
+/// 빠르게 열리도록: async(화면을 멈추지 않음) + 드라이브는 실제로 열어 보지 않고 Windows 목록만 읽는다.
+/// (연결 끊긴 네트워크 드라이브를 확인하다가 몇 초씩 멈추는 문제 방지)
 #[tauri::command]
-fn get_roots(app: AppHandle) -> Vec<Root> {
+async fn get_roots(app: AppHandle) -> Vec<Root> {
     let mut roots = Vec::new();
     let pr = app.path();
     let special: Vec<(&str, Option<PathBuf>)> = vec![
@@ -78,18 +81,24 @@ fn get_roots(app: AppHandle) -> Vec<Root> {
         ("문서", pr.document_dir().ok()),
         ("홈", pr.home_dir().ok()),
     ];
-    for (label, p) in special {
+    for (label, p) in special.into_iter() {
         if let Some(p) = p {
-            if p.is_dir() {
-                roots.push(Root { label: label.into(), path: p.to_string_lossy().into(), kind: "special".into() });
-            }
+            roots.push(Root { label: label.into(), path: p.to_string_lossy().into(), kind: "special".into() });
         }
     }
     #[cfg(windows)]
-    for c in b'A'..=b'Z' {
-        let d = format!("{}:\\", c as char);
-        if Path::new(&d).exists() {
-            roots.push(Root { label: d[..2].to_string(), path: d, kind: "drive".into() });
+    {
+        use windows::core::HSTRING;
+        use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives};
+        const DRIVE_REMOTE: u32 = 4;
+        let mask = unsafe { GetLogicalDrives() };
+        for i in 0..26u32 {
+            if mask & (1 << i) == 0 {
+                continue;
+            }
+            let d = format!("{}:\\", (b'A' + i as u8) as char);
+            let kind = if unsafe { GetDriveTypeW(&HSTRING::from(d.as_str())) } == DRIVE_REMOTE { "network" } else { "drive" };
+            roots.push(Root { label: d[..2].to_string(), path: d, kind: kind.into() });
         }
     }
     #[cfg(not(windows))]

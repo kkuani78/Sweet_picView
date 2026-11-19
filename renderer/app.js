@@ -2,7 +2,7 @@
 'use strict';
 
 const $ = (s) => document.querySelector(s);
-/* global api, PptxGenJS */ // api: preload.js에서 제공
+/* global api, PptxGenJS */ // PptxGenJS는 loadPptLib()로 필요할 때 불러옴 // api: preload.js에서 제공
 const collator = new Intl.Collator('ko', { numeric: true, sensitivity: 'base' });
 
 // ---------------- 상태 ----------------
@@ -66,8 +66,8 @@ async function buildTree() {
   const roots = await api.getRoots();
   let sepAdded = false;
   for (const r of roots) {
-    if (r.kind === 'drive' && !sepAdded) { const s = document.createElement('div'); s.className = 'tree-sep'; tree.appendChild(s); sepAdded = true; }
-    tree.appendChild(makeNode(r.label, r.path, 0, r.kind === 'drive' ? '💽' : '📂'));
+    if (r.kind !== 'special' && !sepAdded) { const s = document.createElement('div'); s.className = 'tree-sep'; tree.appendChild(s); sepAdded = true; }
+    tree.appendChild(makeNode(r.kind === 'network' ? r.label + ' (네트워크)' : r.label, r.path, 0, r.kind === 'drive' ? '💽' : r.kind === 'network' ? '🌐' : '📂'));
   }
 }
 
@@ -1314,6 +1314,22 @@ function setBusy(b) {
 function stamp() { const d = new Date(); const z = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}`; }
 
 // ---------------- PPT 내보내기 ----------------
+// PPT 라이브러리(약 460KB)는 처음 내보낼 때만 불러온다 (프로그램 시작을 가볍게)
+let pptLib = null;
+function loadPptLib() {
+  if (window.PptxGenJS) return Promise.resolve();
+  if (!pptLib) {
+    pptLib = new Promise((resolve, reject) => {
+      const sc = document.createElement('script');
+      sc.src = 'vendor/pptxgen.bundle.js';
+      sc.onload = resolve;
+      sc.onerror = () => { pptLib = null; reject(new Error('PPT 기능을 불러오지 못했습니다')); };
+      document.head.appendChild(sc);
+    });
+  }
+  return pptLib;
+}
+
 async function doExportPpt() {
   if (dlg.busy) return;
   const o = readOpts();
@@ -1323,6 +1339,7 @@ async function doExportPpt() {
   try {
     await ensureDims(items);
     const L = computeLayout(items, o, g.W, g.H, g.margin, g.gap, g.capH);
+    await loadPptLib();
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name: 'PV', width: g.W, height: g.H });
     pptx.layout = 'PV';

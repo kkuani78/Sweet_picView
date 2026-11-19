@@ -400,39 +400,59 @@ fn drag_icon(path: &Path) -> Option<Vec<u8>> {
     Some(buf)
 }
 
-/// 선택한 파일을 다른 프로그램(보드·크롬·탐색기 등)으로 끌어다 놓기. 놓았으면 true
+#[derive(Serialize)]
+struct DragOut {
+    dropped: bool,
+    sent: usize,
+    skipped: usize, // 다른 폴더라 빠진 개수
+}
+
+/// 선택한 파일을 다른 프로그램(보드·크롬·탐색기 등)으로 끌어다 놓기.
+/// Windows 끌기는 한 폴더 안의 파일만 함께 보낼 수 있어서, 첫 파일(잡은 파일)과 같은 폴더의 것만 보낸다.
 #[tauri::command]
-async fn start_drag_files(window: tauri::WebviewWindow, paths: Vec<String>) -> Result<bool, String> {
+async fn start_drag_files(window: tauri::WebviewWindow, paths: Vec<String>) -> Result<DragOut, String> {
+    // 파일마다 디스크를 확인하지 않는다 (네트워크 드라이브에서 수천 장이면 느려짐) — 폴더 이름만 비교
+    let files: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+    let first_dir = files.first().and_then(|p| p.parent().map(|d| d.to_path_buf())).ok_or("끌 파일이 없습니다")?;
+    let total = files.len();
+    let files: Vec<PathBuf> = files.into_iter().filter(|p| p.parent() == Some(first_dir.as_path())).collect();
+    let skipped = total - files.len();
+    let sent = files.len();
     #[cfg(windows)]
     {
-        let icon = paths.first().and_then(|p| drag_icon(Path::new(p))).unwrap_or_default();
+        let icon = drag_icon(&files[0]).unwrap_or_default();
         let (tx, rx) = std::sync::mpsc::channel::<Result<bool, String>>();
         let w = window.clone();
         window
             .run_on_main_thread(move || {
-                let files: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
                 let tx2 = tx.clone();
-                let r = drag::start_drag(
-                    &w,
-                    drag::DragItem::Files(files),
-                    drag::Image::Raw(icon),
-                    move |res, _pos| {
-                        let _ = tx2.send(Ok(matches!(res, drag::DragResult::Dropped)));
-                    },
-                    drag::Options::default(),
-                );
-                if let Err(e) = r {
-                    let _ = tx.send(Err(e.to_string()));
+                // 끌기 라이브러리 안에서 오류가 나도 프로그램이 꺼지지 않게
+                let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    drag::start_drag(
+                        &w,
+                        drag::DragItem::Files(files),
+                        drag::Image::Raw(icon),
+                        move |res, _pos| {
+                            let _ = tx2.send(Ok(matches!(res, drag::DragResult::Dropped)));
+                        },
+                        drag::Options::default(),
+                    )
+                }));
+                match r {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => { let _ = tx.send(Err(e.to_string())); }
+                    Err(_) => { let _ = tx.send(Err("끌기 중 오류가 났습니다".into())); }
                 }
             })
             .map_err(|e| e.to_string())?;
-        tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(Ok(false)))
+        let dropped = tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(Ok(false)))
             .await
-            .map_err(|e| e.to_string())?
+            .map_err(|e| e.to_string())??;
+        Ok(DragOut { dropped, sent, skipped })
     }
     #[cfg(not(windows))]
     {
-        let _ = (window, paths);
+        let _ = (window, sent, skipped);
         Err("끌어서 보내기는 Windows에서만 됩니다".into())
     }
 }

@@ -435,10 +435,12 @@ window.addEventListener('mousemove', (e) => {
   const item = state.view[i];
   if (!item) return;
   // 선택된 썸네일을 끌면 선택한 것 전부, 아니면 그 한 장
-  const paths = state.selected.has(item.path) ? selectedItems().map((x) => x.path) : [item.path];
+  // 잡은 파일을 맨 앞에 (같은 폴더 기준이 됨)
+  const paths = state.selected.has(item.path) ? [item.path].concat(selectedItems().map((x) => x.path).filter((p) => p !== item.path)) : [item.path];
   if (!state.selected.has(item.path)) selectOnly(i);
   dragOutUntil = Infinity;
   api.startDrag(paths)
+    .then((r) => { if (r && r.skipped) toast(`다른 폴더에 있는 ${r.skipped}개는 함께 끌 수 없어 빠졌어요 (Windows는 한 폴더의 파일만 함께 끌 수 있어요)`, { ms: 6000 }); })
     .catch((err) => toast('끌어서 보내기를 할 수 없습니다: ' + esc(String(err)), { error: true }))
     .finally(() => { dragOutUntil = performance.now() + 800; });
 });

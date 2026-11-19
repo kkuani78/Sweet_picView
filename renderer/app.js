@@ -424,12 +424,34 @@ function updatePreview() {
 const gridWrap = $('#gridWrap');
 let rubber = null;
 
+// ---- 썸네일을 끌어서 다른 프로그램(보드·크롬·탐색기 등)으로 보내기 ----
+let tileDrag = null;              // 썸네일 위에서 누른 위치
+let dragOutUntil = 0;             // 이 시간까지는 우리 창에 놓인 파일을 무시
+window.addEventListener('mousemove', (e) => {
+  if (!tileDrag || !(e.buttons & 1)) return;
+  if (Math.hypot(e.clientX - tileDrag.x, e.clientY - tileDrag.y) < 8) return;
+  const i = tileDrag.i;
+  tileDrag = null;
+  const item = state.view[i];
+  if (!item) return;
+  // 선택된 썸네일을 끌면 선택한 것 전부, 아니면 그 한 장
+  const paths = state.selected.has(item.path) ? selectedItems().map((x) => x.path) : [item.path];
+  if (!state.selected.has(item.path)) selectOnly(i);
+  dragOutUntil = Infinity;
+  api.startDrag(paths)
+    .catch((err) => toast('끌어서 보내기를 할 수 없습니다: ' + esc(String(err)), { error: true }))
+    .finally(() => { dragOutUntil = performance.now() + 800; });
+});
+window.addEventListener('mouseup', () => { tileDrag = null; });
+window.addEventListener('blur', () => { tileDrag = null; });
+
 gridWrap.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
   const tile = e.target.closest('.tile');
   if (tile) {
     const i = +tile.dataset.i;
     if (e.target.closest('.check')) { toggleSel(i); setFocus(i, false); return; }
+    tileDrag = { x: e.clientX, y: e.clientY, i };
     if (e.shiftKey && state.anchor >= 0) { selectRange(state.anchor, i, e.ctrlKey || e.metaKey); setFocus(i, false); }
     else if (e.ctrlKey || e.metaKey) { toggleSel(i); setFocus(i, false); }
     else {
@@ -1489,12 +1511,13 @@ gridWrap.addEventListener('wheel', (e) => {
 
 // 끌어다 놓기 (폴더 또는 이미지)
 api.onDrop(async (paths) => {
+  if (performance.now() < dragOutUntil) return; // 방금 우리 창에서 끌어 나간 파일
   const p = paths[0];
   if (!p) return;
   const res = await api.listDir(p, { imagesOnly: true });
   if (!res.error) openFolder(p);
   else openFile(p);
-}, (on) => gridWrap.classList.toggle('dragover', on));
+}, (on) => gridWrap.classList.toggle('dragover', on && performance.now() >= dragOutUntil));
 
 // 이미지 파일 하나 열기 (더블클릭 실행 / 끌어다 놓기)
 async function openFile(p) {

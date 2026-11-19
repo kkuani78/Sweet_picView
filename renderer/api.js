@@ -26,6 +26,7 @@
     renameFiles: (pairs) => inv('rename_files', { pairs }),
     transferFiles: (paths, dest, mode, conflict) => inv('transfer_files', { paths, dest, mode, conflict }),
     onTransferProgress: (cb) => T.event.listen('transfer-progress', (e) => cb(e.payload[0], e.payload[1])),
+    startDrag: (paths) => inv('start_drag_files', { paths }),
     openBoard: (paths, file) => inv('open_board', { paths: paths || [], file: file || null }),
     onResizeProgress: (cb) => T.event.listen('resize-progress', (e) => cb(e.payload[0], e.payload[1])),
     imgUrl: (p) => T.core.convertFileSrc(p, 'localimg'),

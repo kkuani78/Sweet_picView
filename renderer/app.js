@@ -440,7 +440,6 @@ window.addEventListener('mousemove', (e) => {
   if (!state.selected.has(item.path)) selectOnly(i);
   dragOutUntil = Infinity;
   api.startDrag(paths)
-    .then((r) => { if (r && r.skipped) toast(`다른 폴더에 있는 ${r.skipped}개는 함께 끌 수 없어 빠졌어요 (Windows는 한 폴더의 파일만 함께 끌 수 있어요)`, { ms: 6000 }); })
     .catch((err) => toast('끌어서 보내기를 할 수 없습니다: ' + esc(String(err)), { error: true }))
     .finally(() => { dragOutUntil = performance.now() + 800; });
 });
@@ -799,7 +798,7 @@ function fitPane(p) {
   if (!p.nw) return;
   const r = rotOfItem(p.item);
   const rw = r % 180 ? p.nh : p.nw, rh = r % 180 ? p.nw : p.nh;
-  p.fit = Math.min(1, p.el.clientWidth / rw, p.el.clientHeight / rh);
+  p.fit = Math.min(p.el.clientWidth / rw, p.el.clientHeight / rh); // 작은 이미지도 화면에 맞게 키움
 }
 
 // 확대/이동은 칸마다 따로 (다중 보기에서 하나만 확대 가능)

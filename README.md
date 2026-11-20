@@ -13,6 +13,7 @@ ACDSee 스타일의 사내용 이미지 뷰어 (Windows). Tauri 기반이라 설
   - **선택만 보기**: 선택한 이미지만 넘겨 보기 (키 O, 상단 "👁 선택 보기" 버튼)
   - **정보 패널** 토글 (키 I): 해상도, 크기, 날짜, 폴더, 사진 정보(EXIF)
   - 마우스 휠 = 이전/다음 이미지, 확대·축소는 = / - 키 (또는 Ctrl+휠), 1:1(Z), 맞춤(0), 회전(R/L), 슬라이드쇼(F5), 전체 화면(F)
+  - 이미지를 끌면: 창 안에 다 보일 땐 창 이동, 확대해서 넘칠 땐 이미지 이동 (Ctrl+끌기는 항상 창 이동, 최대화 상태에선 Ctrl+끌기만)
 - **이미지 더블클릭으로 열기**: 설치 시 이미지 형식이 연결되며, 이미 켜져 있으면 같은 창에서 열림
 - **지원 형식**: JPG · PNG · GIF · WebP · BMP · AVIF · ICO · SVG · TIFF · TGA · EXR · PSD/PSB · IFF(Maya, Amiga) · HEIC/HEIF · RAW(CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW 등)
   - RAW는 카메라 내장 미리보기 사용, HEIC는 Windows의 "HEIF 이미지 확장"·"HEVC 비디오 확장" 필요

@@ -1041,11 +1041,21 @@ $('#viewer').addEventListener('wheel', (e) => {
   pokeIdle();
 }, { passive: false });
 let pan = null;
+// 이미지가 칸 안에 다 보이는지 (맞춤, 또는 작은 이미지의 100%)
+function paneFits(p) {
+  const r = rotOfItem(p.item);
+  const s = p.fit * p.z;
+  const w = (r % 180 ? p.nh : p.nw) * s, h = (r % 180 ? p.nw : p.nh) * s;
+  return w <= p.el.clientWidth + 1 && h <= p.el.clientHeight + 1;
+}
 vStage.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return;
   const p = paneAt(e.clientX, e.clientY);
   if (!p || !p.item) return;
-  pan = { x: e.clientX, y: e.clientY, pane: p, tx: p.tx, ty: p.ty, moved: false };
+  // 창 이동: 이미지가 칸 안에 다 보이거나 Ctrl을 누른 채 끌 때. 최대화·전체 화면에서는 Ctrl을 눌러야만
+  const winMove = !document.fullscreenElement && (e.ctrlKey || (p.nw && paneFits(p)));
+  pan = { x: e.clientX, y: e.clientY, pane: p, tx: p.tx, ty: p.ty, moved: false, winMove, ctrl: e.ctrlKey,
+    maxed: winMove && !e.ctrlKey ? window.api.isMaximized().catch(() => false) : null };
   vStage.classList.add('drag');
 });
 window.addEventListener('mousemove', (e) => {
@@ -1055,6 +1065,14 @@ window.addEventListener('mousemove', (e) => {
   const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
   if (Math.abs(dx) + Math.abs(dy) > 3) pan.moved = true;
   if (!pan.moved) return;
+  if (pan.winMove) {
+    const cur = pan; pan = null; vStage.classList.remove('drag');
+    Promise.resolve(cur.maxed).then((maxed) => {
+      if (maxed) return; // 최대화 상태에선 그냥 끌어도 창이 작아지지 않게
+      if (e.buttons & 1) window.api.startWindowMove().catch(() => {});
+    });
+    return;
+  }
   pan.pane.tx = pan.tx + dx; pan.pane.ty = pan.ty + dy; pan.pane.isFit = false;
   applyTransform();
 });

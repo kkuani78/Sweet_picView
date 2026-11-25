@@ -12,7 +12,8 @@
 
 ## 구조
 - `src-tauri/src/main.rs` — 명령(폴더 목록, 파일 읽기/저장, 이미지·썸네일 전달 프로토콜, 업데이트, 창 관리)
-- `src-tauri/src/convert.rs` — 특수 형식(TIFF·TGA·EXR·PSD·IFF·RAW·HEIC) 변환 + 캐시
+- `src-tauri/src/convert.rs` — 특수 형식(TIFF·TGA·EXR·PSD·IFF·RAW·HEIC·CLIP) 변환 + 캐시
+- `src-tauri/src/clip.rs` — 클립스튜디오 파일의 내장 미리보기 읽기 (SQLite 라이브러리 없이 필요한 표만 직접 읽음)
 - `src-tauri/src/thumbs.rs` — 빠른 썸네일 (Windows 탐색기 썸네일 → JPEG 축소 디코드 → 일반 디코드)
 - `src-tauri/src/tools.rs` — 리사이즈, 이름 바꾸기, 이동/복사
 - `src-tauri/src/wic.rs` — Windows 전용 (WIC, 탐색기 썸네일)
@@ -21,5 +22,6 @@
 ## 규칙
 - 화면 문구는 한국어, 쉬운 말로.
 - 버전은 세 곳을 함께 올린다: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json`.
+- 버전을 올릴 때 `CHANGES.md`에 `## 버전`과 바뀐 점(`- ` 줄)을 적는다. 릴리스 설명과 앱의 업데이트 알림에 그대로 보인다.
 - PR → (Windows 빌드 확인) → main 병합 시 GitHub Actions가 릴리스와 `latest.json`을 만들고, 앱의 업데이트 버튼이 이를 받는다.
 - `@tauri-apps/cli` 버전은 고정(설치 템플릿 `src-tauri/installer/installer.nsi`가 해당 버전 기준으로 수정됨).

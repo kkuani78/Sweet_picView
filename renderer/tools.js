@@ -356,6 +356,13 @@ function refreshTreeNode() { /* 폴더 트리는 다음에 펼칠 때 갱신됨 
 // ======================= 업데이트 =======================
 const upd = { info: null, busy: false };
 
+// 릴리스 설명에서 "바뀐 점" 줄만 (--- 위쪽의 "- " 줄)
+function updateChanges(notes) {
+  if (!notes) return [];
+  return String(notes).split(/\n-{3,}/)[0].split('\n')
+    .map((l) => l.trim()).filter((l) => /^[-*] /.test(l)).map((l) => l.slice(2).replace(/\*\*/g, '').trim()).slice(0, 8);
+}
+
 async function checkUpdate(manual) {
   if (upd.busy) return;
   if (manual) toast('업데이트 확인 중…', { ms: 2500 });
@@ -364,10 +371,13 @@ async function checkUpdate(manual) {
     upd.info = info;
     const b = $('#btnUpdate');
     if (info) {
+      const changes = updateChanges(info.notes);
       b.textContent = `⬆ 새 버전 ${info.version}`;
+      b.title = changes.length ? '바뀐 점\n' + changes.map((c) => '· ' + c).join('\n') + '\n\n누르면 업데이트합니다' : '누르면 업데이트합니다';
       b.classList.remove('hidden');
-      toast(`새 버전 <b>${esc(info.version)}</b>이 나왔어요. (지금 ${esc(info.current)})`, {
-        ms: 15000, actions: [{ label: '지금 업데이트', run: installUpdate }]
+      const list = changes.length ? '<ul class="t-notes">' + changes.map((c) => `<li>${esc(c)}</li>`).join('') + '</ul>' : '';
+      toast(`새 버전 <b>${esc(info.version)}</b>이 나왔어요. (지금 ${esc(info.current)})${list}`, {
+        ms: changes.length ? 25000 : 15000, actions: [{ label: '지금 업데이트', run: installUpdate }]
       });
     } else {
       b.classList.add('hidden');

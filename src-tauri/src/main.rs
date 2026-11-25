@@ -1,6 +1,7 @@
 // Sweet picView - 백엔드 (파일 읽기, 폴더 목록, 저장, 파일 연결)
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clip;
 mod convert;
 mod tools;
 mod thumbs;
@@ -500,6 +501,17 @@ fn get_launch_path(state: tauri::State<LaunchPath>) -> Option<String> {
 async fn exif_info(path: String) -> Vec<(String, String)> {
     use exif::{In, Tag};
     let mut out = Vec::new();
+    // 클립스튜디오: 원본 캔버스 크기와 미리보기 비율
+    if path.to_lowercase().ends_with(".clip") {
+        if let Ok(p) = clip::preview(Path::new(&path)) {
+            if p.canvas_w > 0 {
+                out.push(("원본 캔버스".into(), format!("{} × {}", p.canvas_w, p.canvas_h)));
+                let pct = (p.preview_w as f64 * 100.0 / p.canvas_w as f64).round();
+                out.push(("표시".into(), format!("내장 미리보기 {} × {} ({pct}%)", p.preview_w, p.preview_h)));
+            }
+        }
+        return out;
+    }
     let file = match fs::File::open(&path) {
         Ok(f) => f,
         Err(_) => return out,

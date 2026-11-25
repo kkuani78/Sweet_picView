@@ -1,5 +1,5 @@
 // 화면(웹뷰)이 직접 못 읽는 형식을 JPEG/PNG로 바꿔서 전달한다.
-// TIFF · TGA · EXR · PSD/PSB · IFF(Maya / Amiga) · RAW(내장 미리보기) · HEIC(Windows 기능 사용)
+// TIFF · TGA · EXR · PSD/PSB · IFF(Maya / Amiga) · RAW(내장 미리보기) · HEIC(Windows 기능 사용) · CLIP(내장 미리보기)
 
 use image::{DynamicImage, ImageBuffer, ImageFormat, Rgba, RgbaImage};
 use std::collections::hash_map::DefaultHasher;
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
 pub const DECODE_EXT: &[&str] = &[
-    "tif", "tiff", "tga", "exr", "psd", "psb", "iff", "heic", "heif",
+    "tif", "tiff", "tga", "exr", "psd", "psb", "iff", "heic", "heif", "clip",
     "cr2", "cr3", "nef", "nrw", "arw", "srf", "sr2", "dng", "raf", "orf", "rw2", "pef", "srw",
 ];
 const RAW_EXT: &[&str] = &["cr2", "cr3", "nef", "nrw", "arw", "srf", "sr2", "dng", "raf", "orf", "rw2", "pef", "srw"];
@@ -85,6 +85,12 @@ pub fn decode_full(path: &Path, ext: &str) -> Result<RgbaImage, String> {
 }
 
 fn produce(path: &Path, ext: &str) -> Result<(Vec<u8>, &'static str), String> {
+    // 클립스튜디오: 안에 든 미리보기(PNG)를 그대로 전달
+    if ext == "clip" {
+        let p = crate::clip::preview(path)?;
+        let mime = if p.data.starts_with(b"\x89PNG") { "image/png" } else if p.data.starts_with(b"RIFF") { return encode(image::load_from_memory(&p.data).map_err(|e| e.to_string())?.to_rgba8()) } else { "image/jpeg" };
+        return Ok((p.data, mime));
+    }
     // RAW: 카메라가 넣어 둔 큰 미리보기 JPEG 사용
     if RAW_EXT.contains(&ext) {
         match raw_preview(path) {
@@ -114,6 +120,7 @@ fn decode_any(path: &Path, ext: &str) -> Result<RgbaImage, String> {
     }
     let r = match ext {
         "psd" | "psb" => decode_psd(&read(path)?),
+        "clip" => image::load_from_memory(&crate::clip::preview(path)?.data).map(|i| i.to_rgba8()).map_err(|e| e.to_string()),
         "iff" => decode_iff(&read(path)?),
         "exr" => decode_float_image(path, ImageFormat::OpenExr),
         "tga" => decode_with(path, ImageFormat::Tga),

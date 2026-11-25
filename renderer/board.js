@@ -9,7 +9,7 @@ const root = $('#root'), stage = $('#stage'), world = $('#world');
 
 const DISPLAY_MAX = 2048;       // 화면용으로 줄이는 크기 (확대하면 원본으로 바꿈)
 const NATIVE = ['jpg', 'jpeg', 'jfif', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif', 'ico'];
-const ALL_IMG = NATIVE.concat(['tif', 'tiff', 'tga', 'exr', 'psd', 'psb', 'iff', 'heic', 'heif',
+const ALL_IMG = NATIVE.concat(['tif', 'tiff', 'tga', 'exr', 'psd', 'psb', 'iff', 'clip', 'heic', 'heif',
   'cr2', 'cr3', 'nef', 'nrw', 'arw', 'srf', 'sr2', 'dng', 'raf', 'orf', 'rw2', 'pef', 'srw']);
 
 // ---------------- 상태 ----------------

@@ -932,7 +932,7 @@ function renderInfo() {
     const p = el.dataset.path;
     const fill = (rows) => {
       if (!rows || !rows.length) return;
-      el.innerHTML = '<div class="sub">사진 정보 (EXIF)</div><table>' + rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('') + '</table>';
+      el.innerHTML = '<div class="sub">' + (/\.clip$/i.test(p) ? '클립스튜디오' : '사진 정보 (EXIF)') + '</div><table>' + rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('') + '</table>';
     };
     if (exifCache.has(p)) fill(exifCache.get(p));
     else api.exif(p).then((rows) => { exifCache.set(p, rows); fill(rows); }).catch(() => exifCache.set(p, []));
@@ -1177,7 +1177,7 @@ async function prepareImage(item, { maxSide = 0, forPpt = false } = {}) {
   c.width = Math.round(outW * s); c.height = Math.round(outH * s);
   const ctx = c.getContext('2d');
   ctx.imageSmoothingQuality = 'high';
-  const alpha = ['png', 'gif', 'webp', 'svg', 'ico', 'avif', 'tga', 'tif', 'tiff', 'exr', 'psd', 'psb', 'iff'].includes(item.ext);
+  const alpha = ['png', 'gif', 'webp', 'svg', 'ico', 'avif', 'tga', 'tif', 'tiff', 'exr', 'psd', 'psb', 'iff', 'clip'].includes(item.ext);
   if (!alpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); }
   ctx.translate(c.width / 2, c.height / 2);
   ctx.rotate(r * Math.PI / 180);

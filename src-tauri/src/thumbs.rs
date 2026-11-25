@@ -58,6 +58,14 @@ pub fn get(path: &Path) -> Result<Thumb, String> {
 
 fn make(path: &Path) -> Result<Thumb, String> {
     let ext = ext_of(path);
+    // 클립스튜디오: 내장 미리보기로 만들고, 크기는 원본 캔버스 크기로 표시
+    if ext == "clip" {
+        let p = crate::clip::preview(path)?;
+        let img = image::load_from_memory(&p.data).map_err(|e| e.to_string())?;
+        let small = img.thumbnail(THUMB_MAX, THUMB_MAX);
+        let (w, h) = if p.canvas_w > 0 { (p.canvas_w, p.canvas_h) } else { (p.preview_w, p.preview_h) };
+        return Ok(Thumb { jpeg: encode(&flatten(&small.to_rgba8()))?, w, h });
+    }
     #[cfg(windows)]
     {
         if let Ok(img) = crate::wic::shell_thumbnail(path, THUMB_MAX) {

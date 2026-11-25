@@ -1,6 +1,6 @@
 [package]
 name = "sweet-picview"
-version = "1.6.3"
+version = "1.7.0"
 description = "Sweet picView 이미지 뷰어"
 edition = "2021"
 

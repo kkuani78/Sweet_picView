@@ -15,8 +15,8 @@ ACDSee 스타일의 사내용 이미지 뷰어 (Windows). Tauri 기반이라 설
   - 마우스 휠 = 이전/다음 이미지, 확대·축소는 = / - 키 (또는 Ctrl+휠), 1:1(Z), 맞춤(0), 회전(R/L), 슬라이드쇼(F5), 전체 화면(F)
   - 이미지를 끌면: 창 안에 다 보일 땐 창 이동, 확대해서 넘칠 땐 이미지 이동 (Ctrl+끌기는 항상 창 이동, 최대화 상태에선 Ctrl+끌기만)
 - **이미지 더블클릭으로 열기**: 설치 시 이미지 형식이 연결되며, 이미 켜져 있으면 같은 창에서 열림
-- **지원 형식**: JPG · PNG · GIF · WebP · BMP · AVIF · ICO · SVG · TIFF · TGA · EXR · PSD/PSB · IFF(Maya, Amiga) · HEIC/HEIF · RAW(CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW 등)
-  - RAW는 카메라 내장 미리보기 사용, HEIC는 Windows의 "HEIF 이미지 확장"·"HEVC 비디오 확장" 필요
+- **지원 형식**: JPG · PNG · GIF · WebP · BMP · AVIF · ICO · SVG · TIFF · TGA · EXR · PSD/PSB · IFF(Maya, Amiga) · HEIC/HEIF · RAW(CR2, CR3, NEF, ARW, DNG, RAF, ORF, RW2, PEF, SRW 등) · 클립스튜디오(CLIP)
+  - RAW는 카메라 내장 미리보기 사용, CLIP은 파일에 든 미리보기 사용(보통 원본의 1/4 크기, 원본 캔버스 크기는 정보 패널에 표시), HEIC는 Windows의 "HEIF 이미지 확장"·"HEVC 비디오 확장" 필요
   - 변환 결과는 임시 폴더(`%TEMP%\sweetpicview-cache`)에 캐시, 14일 지나면 자동 삭제
 - **일괄 리사이즈**: 비율/긴 변/가로/세로/영역 맞추기, 원본 형식·JPG·PNG, 하위 폴더·다른 폴더·덮어쓰기
 - **일괄 이름 바꾸기 (F2)**: 프리픽스, 포스트픽스, 새 이름, 리넘버링(시작·증가·자릿수·위치·구분자), 확장자 대소문자, 미리보기·충돌 검사·되돌리기

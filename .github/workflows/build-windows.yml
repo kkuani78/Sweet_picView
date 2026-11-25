@@ -39,6 +39,15 @@ jobs:
         run: npx tauri build
 
       # main: 빌드 + GitHub 릴리스 (앱의 '업데이트' 버튼이 여기서 새 버전을 받음)
+      - name: 바뀐 점 읽기 (CHANGES.md)
+        id: notes
+        if: env.HAS_SIGNING_KEY == 'true' && github.event_name == 'push'
+        shell: bash
+        run: |
+          v=$(node -p "require('./package.json').version")
+          body=$(awk -v h="## $v" '$0==h{f=1;next} /^## /{f=0} f' CHANGES.md | sed '/^[[:space:]]*$/d')
+          { echo 'body<<NOTES_EOF'; echo "$body"; echo 'NOTES_EOF'; } >> "$GITHUB_OUTPUT"
+
       - name: 빌드 + 릴리스 (main)
         if: env.HAS_SIGNING_KEY == 'true' && github.event_name == 'push'
         uses: tauri-apps/tauri-action@v0
@@ -48,6 +57,9 @@ jobs:
           tagName: v__VERSION__
           releaseName: Sweet picView v__VERSION__
           releaseBody: |
+            ${{ steps.notes.outputs.body }}
+
+            ---
             처음 설치: 아래 Assets의 `..._x64-setup.exe`를 받아 실행하세요.
             이미 설치되어 있으면 앱 위쪽의 **⬆ 업데이트** 버튼(또는 아래 상태줄의 버전 표시 클릭)으로 업데이트할 수 있어요.
           releaseDraft: false

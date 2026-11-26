@@ -108,7 +108,7 @@ async fn get_roots(app: AppHandle) -> Vec<Root> {
 }
 
 #[tauri::command]
-async fn list_dir(dir: String, images_only: Option<bool>) -> ListResult {
+async fn list_dir(dir: String, images_only: Option<bool>, dirs_only: Option<bool>) -> ListResult {
     let mut res = ListResult { path: dir.clone(), dirs: vec![], images: vec![], error: None };
     let rd = match fs::read_dir(&dir) {
         Ok(r) => r,
@@ -118,15 +118,23 @@ async fn list_dir(dir: String, images_only: Option<bool>) -> ListResult {
         }
     };
     let images_only = images_only.unwrap_or(false);
+    let dirs_only = dirs_only.unwrap_or(false);
     for ent in rd.flatten() {
         let name = ent.file_name().to_string_lossy().to_string();
         if skip_name(&name) {
             continue;
         }
         let path = ent.path();
-        let md = match fs::metadata(&path) {
-            Ok(m) => m,
-            Err(_) => continue,
+        // 폴더 트리용: 이미지 파일 정보는 읽지 않는다
+        if dirs_only {
+            if entry_is_dir(&ent) {
+                res.dirs.push(DirEntry { name, path: path.to_string_lossy().into() });
+            }
+            continue;
+        }
+        let md = match entry_meta(&ent) {
+            Some(m) => m,
+            None => continue,
         };
         if md.is_dir() {
             if !images_only {
@@ -138,6 +146,21 @@ async fn list_dir(dir: String, images_only: Option<bool>) -> ListResult {
     }
     res.dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     res
+}
+
+/// 폴더 목록을 읽을 때 이미 받아 둔 정보를 쓴다 (Windows에선 파일을 다시 열지 않아 네트워크 드라이브에서 빠름).
+/// 바로가기 링크(심볼릭 링크·정션)만 실제 대상을 다시 확인한다.
+fn entry_meta(ent: &fs::DirEntry) -> Option<fs::Metadata> {
+    let ft = ent.file_type().ok()?;
+    if ft.is_symlink() { fs::metadata(ent.path()).ok() } else { ent.metadata().ok() }
+}
+
+fn entry_is_dir(ent: &fs::DirEntry) -> bool {
+    match ent.file_type() {
+        Ok(ft) if ft.is_symlink() => fs::metadata(ent.path()).map(|m| m.is_dir()).unwrap_or(false),
+        Ok(ft) => ft.is_dir(),
+        Err(_) => false,
+    }
 }
 
 #[tauri::command]
@@ -161,9 +184,9 @@ async fn list_recursive(dir: String) -> Vec<ImageEntry> {
                 continue;
             }
             let path = ent.path();
-            let md = match fs::metadata(&path) {
-                Ok(m) => m,
-                Err(_) => continue,
+            let md = match entry_meta(&ent) {
+                Some(m) => m,
+                None => continue,
             };
             if md.is_dir() {
                 stack.push((path, depth + 1));

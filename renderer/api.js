@@ -4,7 +4,7 @@
   const inv = (cmd, args, opts) => T.core.invoke(cmd, args, opts);
   window.api = {
     getRoots: () => inv('get_roots'),
-    listDir: (dir, opts) => inv('list_dir', { dir, imagesOnly: !!(opts && opts.imagesOnly) }),
+    listDir: (dir, opts) => inv('list_dir', { dir, imagesOnly: !!(opts && opts.imagesOnly), dirsOnly: !!(opts && opts.dirsOnly) }),
     listRecursive: (dir) => inv('list_recursive', { dir }),
     pickFolder: () => inv('pick_folder'),
     parentDir: (p) => inv('parent_dir', { p }),

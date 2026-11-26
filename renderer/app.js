@@ -55,7 +55,9 @@ function toast(msg, opts = {}) {
 }
 
 // ---------------- 폴더 트리 ----------------
-async function buildTree() {
+let treeReady = null; // 드라이브 목록을 다 그리면 끝나는 약속
+function buildTree() { treeReady = buildTreeInner(); return treeReady; }
+async function buildTreeInner() {
   const tree = $('#tree');
   tree.innerHTML = '';
   const favBox = document.createElement('div');
@@ -84,19 +86,24 @@ function makeNode(label, p, depth, icon = '📁') {
   kids.className = 'hidden';
   let loaded = false;
   const tw = row.querySelector('.twisty');
+  let loading = null;
   async function toggle(forceOpen) {
     const open = forceOpen === true ? true : kids.classList.contains('hidden');
     if (open && !loaded) {
-      loaded = true;
-      const res = await api.listDir(p);
-      if (!res.dirs.length) tw.classList.add('none');
-      for (const d of res.dirs) kids.appendChild(makeNode(d.name, d.path, depth + 1));
+      loading = loading || (async () => {
+        const res = await api.listDir(p, { dirsOnly: true });
+        if (!res.dirs.length) tw.classList.add('none');
+        for (const d of res.dirs) kids.appendChild(makeNode(d.name, d.path, depth + 1));
+        loaded = true;
+      })();
+      await loading;
     }
     kids.classList.toggle('hidden', !open);
     tw.textContent = open ? '▼' : '▶';
   }
+  row._open = () => toggle(true);
   tw.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
-  row.addEventListener('click', () => { openFolder(p); toggle(true); });
+  row.addEventListener('click', () => { openFolder(p, null, { fromTree: true }); toggle(true); });
   row.addEventListener('dblclick', (e) => { e.stopPropagation(); });
   wrap.appendChild(row);
   wrap.appendChild(kids);
@@ -178,10 +185,39 @@ $('#tree').addEventListener('contextmenu', (e) => {
   renderMenu(e.clientX, e.clientY, items);
 });
 
+// 지금 연 폴더까지 왼쪽 트리를 펼친다 (즐겨찾기 말고 드라이브·특수 폴더 쪽)
+// 위 폴더들만 차례로 읽고(폴더 이름만), 다른 폴더를 열면 하던 걸 멈춘다.
+let revealToken = 0;
+async function revealInTree(p) {
+  const token = ++revealToken;
+  if (treeReady) await treeReady;
+  if (token !== revealToken) return;
+  const target = normPath(p);
+  const under = (a) => target === a || target.startsWith(a + '/') || target.startsWith(a + '\\');
+  const top = [...document.querySelectorAll('#tree > div > .node')]
+    .filter((n) => under(normPath(n.dataset.path)))
+    .sort((a, b) => b.dataset.path.length - a.dataset.path.length)[0];
+  let node = top;
+  while (node && token === revealToken) {
+    const np = normPath(node.dataset.path);
+    if (np === target) {
+      markTreeActive();
+      const t = $('#tree').getBoundingClientRect(), r = node.getBoundingClientRect();
+      if (r.top < t.top || r.bottom > t.bottom) node.scrollIntoView({ block: 'center' });
+      return;
+    }
+    await node._open();
+    if (token !== revealToken) return;
+    const kids = node.nextElementSibling;
+    node = [...kids.children].map((w) => w.firstChild).find((c) => under(normPath(c.dataset.path)));
+  }
+}
+
 function markTreeActive() {
   document.querySelectorAll('.node.active').forEach((n) => n.classList.remove('active'));
   if (!state.folder) return;
-  document.querySelectorAll('.node').forEach((n) => { if (n.dataset.path === state.folder) n.classList.add('active'); });
+  const cur = normPath(state.folder);
+  document.querySelectorAll('.node').forEach((n) => { if (normPath(n.dataset.path) === cur) n.classList.add('active'); });
 }
 
 // ---------------- 폴더 열기 ----------------
@@ -207,6 +243,7 @@ async function openFolder(p, focusPath, opts = {}) {
   thumbQueue.length = 0;
   applyView();
   markTreeActive();
+  if (!opts.fromTree) revealInTree(p);
   updateStar();
   if (focusPath) {
     const i = state.view.findIndex((x) => x.path === focusPath);
@@ -1585,6 +1622,7 @@ document.querySelectorAll('.seg-b').forEach((b) => {
   state.sortBy = store.get('sortBy', 'name'); $('#sortBy').value = state.sortBy;
   state.sortAsc = store.get('sortAsc', true); $('#btnSortDir').textContent = state.sortAsc ? '↑' : '↓';
   api.onOpenFile((p) => openFile(p));
+  buildTree(); // 드라이브 목록은 기다리지 않고 따로 그린다 (열린 폴더 펼치기가 이걸 기다림)
   const launch = await api.getLaunchPath();
   if (launch) {
     // 이미지를 더블클릭해서 실행한 경우: 바로 뷰어부터 띄운다
@@ -1597,7 +1635,6 @@ document.querySelectorAll('.seg-b').forEach((b) => {
       if (!res.error) openFolder(last);
     }
   }
-  buildTree();
   $('#btnDefault').classList.toggle('hidden', !api.isWindows);
   updateStatus();
 })();
